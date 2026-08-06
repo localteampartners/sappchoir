@@ -1,0 +1,2 @@
+/usr/bin/ar qc libSappSounds.a CMakeFiles/SappSounds.dir/src/WavIo.cpp.o CMakeFiles/SappSounds.dir/src/FlacDecode.cpp.o CMakeFiles/SappSounds.dir/src/SfzParser.cpp.o CMakeFiles/SappSounds.dir/src/InstrumentLoader.cpp.o CMakeFiles/SappSounds.dir/src/PlaybackEngine.cpp.o CMakeFiles/SappSounds.dir/src/DiagnosticInstrument.cpp.o CMakeFiles/SappSounds.dir/src/MidiFile.cpp.o CMakeFiles/SappSounds.dir/src/OfflineRender.cpp.o
+/usr/bin/ranlib libSappSounds.a

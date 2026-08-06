@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/michael/apps/sappchoir/build-plugin/vst3_helpers/SappChoirPlugin/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

@@ -1,0 +1,3 @@
+/Users/michael/apps/sappchoir/build-plugin/vst3_helpers/SappChoirPlugin/CMakeFiles/vst3_helper.dir
+/Users/michael/apps/sappchoir/build-plugin/vst3_helpers/SappChoirPlugin/CMakeFiles/edit_cache.dir
+/Users/michael/apps/sappchoir/build-plugin/vst3_helpers/SappChoirPlugin/CMakeFiles/rebuild_cache.dir

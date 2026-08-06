@@ -82,9 +82,9 @@ public:
         static constexpr float baseMs[kLines] = {40.1f, 50.3f, 55.7f, 63.9f,
                                                  72.9f, 83.3f, 97.1f, 112.3f};
         for (int i = 0; i < kLines; ++i) {
-            baseSamples_[i] = float(baseMs[i] * 0.001 * sampleRate);
-            const size_t cap = size_t(baseSamples_[i] * 2.2f) + 64;
-            lines_[i].assign(cap, 0.0f);
+            baseSamples_[i] = float(baseMs[size_t(i)] * 0.001 * sampleRate);
+            const size_t cap = size_t(baseSamples_[size_t(i)] * 2.2f) + 64;
+            lines_[size_t(i)].assign(cap, 0.0f);
             writePos_[i] = 0;
             damp_[i] = 0.0f;
             lfoPhase_[i] = float(i) * 0.785f;
@@ -118,13 +118,13 @@ public:
                 if (lfoPhase_[i] > 6.2831853f) lfoPhase_[i] -= 6.2831853f;
                 const float mod = std::sin(lfoPhase_[i]) * modSamples_;
                 const float delay = delaySamples_[i] + mod;
-                const int size = int(lines_[i].size());
+                const int size = int(lines_[size_t(i)].size());
                 float pos = float(writePos_[i]) - delay;
                 while (pos < 0.0f) pos += float(size);
                 const int i0 = int(pos);
                 const float frac = pos - float(i0);
                 const int i1 = i0 + 1 >= size ? 0 : i0 + 1;
-                read[i] = lines_[i][size_t(i0)] * (1.0f - frac) + lines_[i][size_t(i1)] * frac;
+                read[i] = lines_[size_t(i)][size_t(i0)] * (1.0f - frac) + lines_[size_t(i)][size_t(i1)] * frac;
                 sum += read[i];
             }
 
@@ -135,8 +135,8 @@ public:
                 // One-pole damping inside the loop.
                 damp_[i] += dampCoef_ * (v - damp_[i]);
                 v = damp_[i];
-                lines_[i][size_t(writePos_[i])] = v;
-                if (++writePos_[i] >= int(lines_[i].size())) writePos_[i] = 0;
+                lines_[size_t(i)][size_t(writePos_[i])] = v;
+                if (++writePos_[i] >= int(lines_[size_t(i)].size())) writePos_[i] = 0;
             }
 
             outL[f] = (read[0] - read[2] + read[4] - read[6]) * 0.35f;
@@ -171,7 +171,7 @@ private:
     {
         for (int i = 0; i < kLines; ++i) {
             delaySamples_[i] = std::min(baseSamples_[i] * size_ * 2.0f,
-                                        float(lines_[i].size()) - 8.0f);
+                                        float(lines_[size_t(i)].size()) - 8.0f);
             // Per-line gain for a uniform T60 across all line lengths.
             feedback_[i] = std::pow(10.0f, -3.0f * delaySamples_[i] /
                                                 (decay_ * float(sampleRate_)));
