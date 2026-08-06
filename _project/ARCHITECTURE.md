@@ -4,53 +4,46 @@
 
 ## Tech stack
 
-- **Language / runtime:** <!-- FILL IN: e.g., Node 20, Python 3.12, Go 1.22 -->
-- **Framework:** <!-- FILL IN: e.g., Next.js 15, FastAPI, Express -->
-- **Database:** <!-- FILL IN: e.g., Postgres 16, SQLite, none -->
-- **Key libraries:** <!-- FILL IN: only ones that meaningfully shape the code -->
-- **Frontend:** <!-- FILL IN or "n/a" -->
-- **Build / package manager:** <!-- FILL IN: npm, pnpm, uv, cargo -->
+- **Language / runtime:** C++20, CMake ≥ 3.24
+- **Framework:** JUCE 8.0.15 (plugin/UI only; core is framework-free)
+- **Engine:** SappSounds (`Sapp::Sounds`) via `add_subdirectory(../sappsounds)`
+  (sibling checkout; FetchContent fallback from GitHub)
+- **Tests:** Catch2 v3.7.1
+- **Database:** none
 
 ## Components
 
-High-level blocks and what each is responsible for.
-
-- **<!-- FILL IN: component name -->** — <!-- FILL IN: what it does -->
-- 
-- 
+- `src/core/` (`sappchoir_core`, no JUCE):
+  - `VowelLayers` — vowel policy. `makeVowelInstrument()` quadruples attack
+    regions, formant-filters each sample (3 parallel RBJ bandpass + dry
+    blend, RMS-matched) into oo/oh/ah/eh, and registers live CC 20
+    crossfades (`xfin/xfout` windows 0-42-85-127). Skips instruments that
+    already ship CC 20 crossfades. Offline, deterministic.
+  - `ChoirEngine` — product policy over `sapp::sounds::PlaybackEngine`:
+    Vowel CC injection (parameter → CC 20, incoming CC authoritative), CC1
+    dynamics (−18 dB + LP timbre), CC11 expression, breath (HF shelf +
+    envelope-gated noise bed), ensemble (randomTuneCents 0–14¢ + slow level
+    breathing), width (M/S), legato policy, cathedral sends, tanh limiter.
+  - `CathedralReverb.h` — `EarlyReflections` (late dark taps, predelay from
+    size) + `CathedralReverb` (8-line Householder FDN, long base delays,
+    T60 0.5–20 s, heavy damping range, slow modulation).
+  - `ChoirRender` — deterministic offline render; applies SappLink CCs to
+    params mid-render exactly like the plugin path.
+  - `SappLinkCCMap` — the one CC table both paths share.
+- `src/plugin/` — `SappChoirProcessor` (APVTS, knob→CC bridges, SappLink CC
+  slews, async SFZ load + vowel generation off the audio thread) +
+  `SappChoirEditor` (candlelit cathedral, `VowelWheel`).
+- `src/cli/` — `sappchoir` binary; JSON contracts in docs/agent_api.md.
+- `tools/uishot/` — offscreen editor PNG + `--cctest` plugin-path proof.
+- `tests/` — 28 unit tests incl. SappLink manifest drift guard.
 
 ## Data flow
 
-How a request / event moves through the system.
+MIDI → ChoirEngine: CC1/CC11 live-override params; CC20 forwards to the
+sampler where per-voice vowel crossfades morph; param `vowel` changes are
+re-injected as CC20 (once, quantized). Sampler renders dry → width →
+dynamics timbre LP → air shelf + breath noise → ensemble breathing → early
+reflections → FDN tail → master/limiter.
 
-```
-<!-- FILL IN: ascii diagram, or a numbered list like: -->
-<!-- 1. User hits /api/foo -->
-<!-- 2. Handler validates with Zod, then calls FooService -->
-<!-- 3. FooService reads from Postgres via Drizzle -->
-<!-- 4. Response serialized + returned -->
-```
-
-## Key directories
-
-Only list directories whose purpose isn't obvious from the name.
-
-| Path | Purpose |
-|---|---|
-| `<!-- FILL IN -->` | <!-- FILL IN --> |
-|  |  |
-
-## External touchpoints
-
-What this project talks to across the network. See [DEPENDENCIES.md](DEPENDENCIES.md)
-for account/billing details.
-
-- <!-- FILL IN: e.g., "Stripe API for payments", "OpenAI for embeddings" -->
-- 
-
-## Known sharp edges
-
-Architectural things that will bite someone if they don't know about them.
-
-- <!-- FILL IN: e.g., "Worker must finish within 10s or Cloudflare kills it" -->
-- 
+Layout: 940×620 plugin editor; core has no UI deps. Ownership boundary:
+SappSounds owns SFZ/voices/crossfades; sappchoir owns choir policy.

@@ -1,78 +1,42 @@
 # RUNBOOK — sappchoir
 
-<!-- UPDATE WHEN: any command here stops working, or a new operational task becomes routine enough to document -->
+<!-- UPDATE WHEN: run/deploy/rollback steps change -->
 
-The authoritative source for "how do I operate this thing?"
-
----
-
-## Run locally
-
-### One-time setup
+## Build + test (fast loop)
 
 ```bash
-# <!-- FILL IN: clone, install deps, create .env from .env.example, run migrations -->
+./verify.sh          # configure (first run), build core+CLI+tests, run all
 ```
 
-### Start the app
+## Plugin build
 
 ```bash
-# <!-- FILL IN: e.g., npm run dev -->
+cmake -S . -B build-plugin -DCMAKE_BUILD_TYPE=Release -DSAPPCHOIR_BUILD_TESTS=OFF \
+      -DFETCHCONTENT_SOURCE_DIR_JUCE=$HOME/apps/sappsynth/build/_deps/juce-src
+cmake --build build-plugin -j8
+# artefacts: build-plugin/SappChoirPlugin_artefacts/Release/{Standalone,VST3,AU}
+# AU/VST3 are auto-copied to ~/Library/Audio/Plug-Ins on macOS.
 ```
 
-### Run tests
+## UI screenshot / SappLink plugin proof
 
 ```bash
-# <!-- FILL IN -->
+./build-plugin/SappChoirUiShot_artefacts/Release/SappChoirUiShot.app/Contents/MacOS/SappChoirUiShot /tmp/sappchoir-ui.png
+./build-plugin/SappChoirUiShot_artefacts/Release/SappChoirUiShot.app/Contents/MacOS/SappChoirUiShot --cctest
 ```
 
----
-
-## Deploy
-
-**Hosting:** see [INFRASTRUCTURE.md](INFRASTRUCTURE.md) for the *where*.
-This section is the *how*.
+## Demo render
 
 ```bash
-# <!-- FILL IN: deploy command or step-by-step -->
+python3 scripts/make_choir_demo.py    # → /tmp/sappchoir-demo.wav
 ```
 
-### Rollback
+## Samples
 
 ```bash
-# <!-- FILL IN: how to revert a bad deploy -->
+~/apps/sappsounds/scripts/fetch-library.sh get sonatina
+~/apps/sappsounds/scripts/fetch-library.sh get freepats-synth-choir
+~/apps/sappsounds/scripts/fetch-library.sh get legato-vocal
 ```
 
----
-
-## Operate (if there's a VPS / running service)
-
-### Check it's alive
-
-```bash
-# <!-- FILL IN: healthcheck URL, or ssh + systemctl status -->
-```
-
-### Restart
-
-```bash
-# <!-- FILL IN -->
-```
-
-### Tail logs
-
-```bash
-# <!-- FILL IN -->
-```
-
----
-
-
-## Debug checklist
-
-When something's broken, try these in order:
-
-1. <!-- FILL IN: e.g., "check the healthcheck endpoint" -->
-2. <!-- FILL IN: e.g., "tail the last 200 log lines" -->
-3. <!-- FILL IN: e.g., "verify env vars match ENVIRONMENT.md" -->
-4. <!-- FILL IN: e.g., "check external service status pages (see DEPENDENCIES.md)" -->
+No deploy target: this is a local-build instrument. Rollback = git.

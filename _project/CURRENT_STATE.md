@@ -2,37 +2,35 @@
 
 <!-- UPDATE WHEN: a feature ships, a deploy happens, something breaks, or something gets fixed. This file answers "what's the project like *right now*?" -->
 
-**Last verified:** <!-- FILL IN: YYYY-MM-DD, the date the info below was confirmed -->
+**Last verified:** 2026-08-06
 
 ---
 
 ## What's built and working
 
-- <!-- FILL IN: features that exist and function -->
-- 
-- 
+- v0.1.0 complete: core engine, vowel morphing (generated formant layers on
+  CC 20, live crossfades), cathedral room, breath/ensemble/width controls.
+- Plugin builds Standalone/VST3/AU (JUCE 8.0.15); candlelit cathedral UI
+  with vowel morph wheel; UiShot screenshot + `--cctest` pass.
+- Agent CLI: inspect/validate/params/vowels/scan/render — JSON, seeded,
+  deterministic (same seed ⇒ bit-identical WAV).
+- SappLink v1: manifest in sapptune, vendored copy + drift-guard test; CC
+  20 vowel / 21 breath / 22 ensemble / space CCs; CC1/11/64 engine-native.
+- 28 Catch2 tests green; `./verify.sh` passes (<60 s warm).
+- Demo: `scripts/make_choir_demo.py` renders an 8-bar SATB progression with
+  Sonatina Mixed Chorus + oo→ah→oo vowel journey.
+- Sample libraries: Sonatina Chorus (local), freepats-synth-choir +
+  legato-vocal registered in sappsounds fetch-library.sh (CC0, fetched).
 
-## What's deployed
+## Known issues
 
-- **Environment:** <!-- FILL IN: e.g., "production on VPS (see INFRASTRUCTURE.md)", "local only", "staging at staging.example.com" -->
-- **Version / commit:** <!-- FILL IN: short SHA or tag, if relevant -->
-- **Deployed at:** <!-- FILL IN: YYYY-MM-DD -->
+- Generated vowel layers 4× RAM per instrument (originals kept for release
+  triggers). Fine for choir-sized SFZs; large keyswitch libraries get big.
+- Formant filtering assumes a sung/voiced source; percussive content will
+  sound resonant (use `--raw`).
+- VSCO 2 CE has no vocal content (verified) — not used by sappchoir.
 
-## What's in progress
+## Deploy state
 
-- <!-- FILL IN: things actively being worked on but not done -->
-- 
-
-## What's known broken / flaky
-
-Separate from backlog in TODO.md — these are things that *should* work but don't.
-
-- <!-- FILL IN: e.g., "login breaks on Safari after a 401 refresh" -->
-- 
-
-## Half-finished or abandoned
-
-Code that exists but isn't wired up. Future-you will be confused by this.
-
-- <!-- FILL IN: e.g., "billing/ directory is a dead prototype, don't use" -->
-- 
+Local builds only; repo at github.com/localteampartners/sappchoir. No VPS,
+no monitor, no secrets.

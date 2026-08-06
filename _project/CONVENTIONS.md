@@ -1,32 +1,19 @@
 # CONVENTIONS — sappchoir
 
-<!-- UPDATE WHEN: you learn (or are corrected on) a non-obvious workflow fact — a deploy quirk, version pin, build gotcha, naming rule, or "never do X here." If a session had to rediscover it, it belongs in this file. -->
+<!-- UPDATE WHEN: you learn a non-obvious workflow fact (deploy quirk, version pin, "never do X") -->
 
-How we work on this project — facts that aren't derivable from the code and
-that every new session would otherwise relearn the hard way. One or two lines
-per entry: the rule, then the why (when the why isn't obvious).
-
-## Deploy & operations
-
-<!-- FILL IN: e.g., "Deploy = commit, push, then `vps-proxy run 'git pull && pm2 reload'`. Never rsync/scp files to the server." -->
--
-
-## Toolchain & versions
-
-<!-- FILL IN: e.g., "Node 22 (`nvm use 22`) — the shell default is older", "builds need the iPhone 17 / iOS 26.2 simulator" -->
--
-
-## Build / test gotchas
-
-<!-- FILL IN: e.g., "verify.sh only covers the API — the worker has its own test entry point" -->
--
-
-## Code & naming rules
-
-<!-- FILL IN: repo-specific rules Claude has been taught, e.g., "sync Xcode file groups; never hand-edit project.pbxproj" -->
--
-
-## Never do
-
-<!-- FILL IN: hard prohibitions with the reason, e.g., "never raw ssh/scp — always vps-proxy (credential + approval gates)" -->
--
+- **JUCE pinned at 8.0.15** — same tag across sappsynth/sapporchestra/
+  sappchoir; reuse the checkout at `~/apps/sappsynth/build/_deps/juce-src`
+  via `FETCHCONTENT_SOURCE_DIR_JUCE` to avoid a 300 MB clone.
+- Two build trees: `build/` (core+CLI+tests, plugin OFF — the verify loop),
+  `build-plugin/` (plugin+UiShot, tests OFF). Keep it that way; mixing makes
+  verify slow.
+- Parameter IDs are compatibility contracts (APVTS + SappLink + CLI docs) —
+  never rename/renumber.
+- If the SappLink manifest changes, update sapptune's copy, the vendored
+  `tests/data/sapplink-manifest.json`, and `src/core/SappLinkCCMap.cpp`
+  together — the drift test fails otherwise, by design.
+- The core (`src/core`, `src/cli`, tests) must never include JUCE.
+- Warnings are errors-in-spirit: sappchoir targets build clean under
+  `-Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion`.
+- No AI co-author trailers in commits.

@@ -2,38 +2,46 @@
 
 <!-- UPDATE WHEN: you make a non-obvious choice (library pick, architectural pattern, tradeoff). One entry per decision, newest at top. -->
 
-The *why* behind choices that aren't self-evident from the code. The #1 question
-future-you will ask is "why did I do it this way?" — answer it here, once, when
-it's fresh.
-
-Skip obvious decisions ("I used Express because it's a Node web framework").
-Write decisions where someone smart would reasonably pick differently.
-
 ---
 
-## Format
+## 2026-08-06 — Vowel CC is BOTH SappLink-mapped and sampler-native
 
-```
-## YYYY-MM-DD — short title
+CC 20 slews the `vowel` APVTS parameter (SappLink path) *and* the raw CC
+reaches the sampler where SFZ crossfades morph per-voice. To avoid the two
+fighting, ChoirEngine re-injects CC 20 only when the quantized *parameter*
+value changes, and records incoming CC 20 as already-sent. One controller,
+both consumers, no feedback loop. Alternative (engine-native only, like
+CC1) would have hidden `vowel` from the manifest.
 
-**Decision:** what you chose.
-**Context:** the situation that forced the choice.
-**Alternatives considered:** what else was on the table, and why they lost.
-**Tradeoffs:** what this choice costs you.
-**Revisit if:** the condition that would make you reconsider.
-```
+## 2026-08-06 — Generate vowel layers at load, not at build/install
 
----
+`makeVowelInstrument()` runs in the async load thread: 3 parallel RBJ
+bandpass biquads + 22% dry blend, RMS-matched, per sample per vowel.
+Deterministic, no cache files on disk, works for any SFZ the user loads.
+Cost: ~4× sample RAM + a moment at load. Libraries already shipping CC 20
+crossfades pass through untouched (`hasVowelLayers` guard, idempotent).
 
-## Entries
+## 2026-08-06 — Crossfade windows 0/42/85/127, adjacent xfin==xfout
 
-<!-- Newest first. Example below — delete once you have real entries. -->
+Each vowel's fade-in range equals the previous vowel's fade-out range, so
+every CC value sums to constant power (SappSounds' default equal-power
+curve). Verified by tiling assertions in test_vowel.cpp.
 
-## YYYY-MM-DD — Example: chose SQLite over Postgres
+## 2026-08-06 — Cathedral = retuned copy of sapporchestra's Reverb.h, not a shared lib
 
-**Decision:** use SQLite with WAL mode for v1.
-**Context:** single-user app, will run on one VPS, expected <1k writes/day.
-**Alternatives considered:** Postgres (heavier ops for no current benefit),
-DuckDB (analytical, not OLTP), plain JSON files (no concurrency safety).
-**Tradeoffs:** can't scale out horizontally; migrations are manual-ish.
-**Revisit if:** multi-user, multi-writer, or dataset >10GB.
+Same FDN topology (8 lines, Householder), but base delays ~1.35×, decay
+clamp 0.5–20 s, damping range to 0.92, slower LFOs. Sharing a DSP lib with
+sapporchestra would couple release cycles for ~150 lines of header; the
+suite treats product DSP as product-owned (same reason SappSounds has no
+SappLink code).
+
+## 2026-08-06 — Breath is engine DSP, not sample layers
+
+Air = HF shelf on the post-timbre signal + envelope-follower-gated filtered
+noise. No breath samples exist in the free libraries; synthesizing keeps it
+library-independent and silence-safe (no notes → no hiss).
+
+## 2026-08-06 — kept sapporchestra's stage/pan out
+
+A choir sits where it sits; ensemble/width/space cover the imaging. Fewer
+params keeps the vowel wheel the undisputed hero control.

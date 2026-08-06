@@ -10,49 +10,36 @@ monitor:
     Ethereal choir & vocal-pad instrument (JUCE Standalone/VST3/AU) built on the
     SappSounds engine: live vowel morphing on a dedicated CC, breath/air
     control, ensemble size, cathedral room, agent CLI + SappLink manifest.
-  status: paused
+  status: active
   tags:
-    - web
     - internal
+    - audio
   owner: localteampartners@gmail.com
   urls:
-    primary: https://example.com
-    admin: https://example.com/admin
-    docs: https://example.com/docs
-    repo: https://github.com/you/repo
+    repo: https://github.com/localteampartners/sappchoir
   host:
     vps: none
-    path: /var/www/example
-    process_manager: pm2
-    pm2_name: example-api
-    nginx_site: example.com
   stack:
-    runtime: node 22
-    framework: next.js 15
-    database: postgres 16
-    key_libraries: []
-    external_services:
-      - stripe
-      - openai
+    runtime: C++20 / CMake
+    framework: JUCE 8.0.15
+    database: none
+    key_libraries:
+      - sappsounds (Sapp::Sounds engine)
+      - Catch2 3.7.1
+    external_services: []
   purpose: |
-    What problem this project solves and for whom.
+    Ethereal choir & vocal-pad instrument with live vowel morphing (CC20),
+    breath/ensemble controls, and a cathedral room — playable by humans
+    (Standalone/VST3/AU) and drivable by agents (JSON CLI + SappLink).
   features:
-    - User-facing feature A
-    - Admin feature B
-    - Scheduled job C
-  checks:
-    - name: homepage
-      type: http
-      url: https://example.com
-      method: GET
-      expect_status: 200
-      expect_body_contains: ""
-      timeout_ms: 5000
-      interval_seconds: 60
-      headers: {}
+    - Vowel morphing via generated formant layers + live CC crossfades
+    - Cathedral reverb (T60 to 20 s), breath/air, ensemble size
+    - Agent CLI: inspect/validate/params/vowels/scan/render (seeded)
+    - SappLink v1 manifest with drift-guard test
+  checks: []
   notes: |
-    Anything worth remembering: gotchas, deploy quirks, who to call, known
-    flaky behavior, etc. Free-form markdown.
+    Local-build instrument, no deploy target. Tags kept minimal; not a web
+    property despite the template defaults.
 backup:
   schema: 1
   project_id: sappchoir

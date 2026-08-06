@@ -1,49 +1,25 @@
 # DEPENDENCIES — sappchoir
 
-<!-- UPDATE WHEN: an external service/API is added or removed, an account changes hands, billing changes, or credentials rotate -->
+<!-- UPDATE WHEN: an external service, API, or account is added/removed -->
 
-External systems this project depends on. If access to any of these is lost,
-part or all of the project stops working. This file tells you what to recover.
+## Code
 
-Runtime library dependencies live in `package.json` / `requirements.txt` /
-similar — don't duplicate them here.
+- **SappSounds** — sibling checkout `../sappsounds` (or FetchContent from
+  github.com/localteampartners/sappsounds). The sample engine.
+- **JUCE 8.0.15** — FetchContent; local reuse via
+  `-DFETCHCONTENT_SOURCE_DIR_JUCE=~/apps/sappsynth/build/_deps/juce-src`.
+- **Catch2 v3.7.1** — FetchContent (tests only).
 
----
+## Sample libraries (fetched, never committed)
 
-## External services
+- Sonatina Symphonic Orchestra — Chorus (CC Sampling Plus 1.0)
+- freepats-synth-choir (CC0) · legato-vocal (CC0) — via sappsounds
+  `scripts/fetch-library.sh`
 
-| Service | What it does | Account (email) | Paid with | Monthly cost | Status page |
-|---|---|---|---|---|---|
-| <!-- e.g., Stripe --> | <!-- e.g., payments --> | <!-- email on the account --> | <!-- card ending 1234 --> | <!-- $X/mo --> | <!-- URL --> |
-|  |  |  |  |  |  |
+## Cross-repo contracts
 
-## Domain / DNS
+- SappLink manifest: `~/apps/sapptune/sapplink/manifests/sappchoir.json`
+  (source of truth) ↔ `tests/data/sapplink-manifest.json` (vendored,
+  drift-guarded by `SappChoirTests "[sapplink]"`).
 
-See [INFRASTRUCTURE.md](INFRASTRUCTURE.md) for the primary domain. If this
-project uses additional domains or subdomains from different registrars, list
-them here.
-
-- <!-- FILL IN or "none" -->
-
-## APIs & credentials
-
-For each external API, point to where the credentials live (never paste them here).
-
-| API | Credential type | Where it lives |
-|---|---|---|
-| <!-- e.g., OpenAI --> | <!-- API key --> | <!-- e.g., "1Password > sappchoir > OPENAI_API_KEY" --> |
-|  |  |  |
-
-## Single points of failure
-
-If any one of these goes down or we lose access, what breaks?
-
-- <!-- FILL IN: e.g., "Stripe down → checkout broken (read-only mode still works)" -->
-- 
-
-## Account recovery
-
-Who / what can recover access if the primary account is locked out?
-
-- <!-- FILL IN: e.g., "all provider accounts use localteampartners@gmail.com; recovery email is X" -->
-- 
+No external services, accounts, or secrets.
