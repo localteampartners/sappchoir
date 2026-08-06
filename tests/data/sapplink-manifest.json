@@ -1,0 +1,25 @@
+{
+  "sapplink": "1.0",
+  "name": "sappchoir",
+  "kind": "sampler",
+  "midi": {
+    "channelPolicy": "any",
+    "polyphony": 96,
+    "pitchBendRangeSemitones": 2
+  },
+  "parameters": [
+    { "id": "masterGain",   "label": "Master",           "cc": 7,   "range": [-24, 12],  "curve": "linear", "tags": ["volume"] },
+    { "id": "earlyLevel",   "label": "Early Stone",      "cc": 14,  "range": [0, 1],     "curve": "linear", "tags": ["space", "proximity"] },
+    { "id": "spaceDecay",   "label": "Cathedral Decay",  "cc": 15,  "range": [1, 20],    "curve": "log",    "tags": ["space", "tail"] },
+    { "id": "width",        "label": "Width",            "cc": 18,  "range": [0, 2],     "curve": "linear", "tags": ["width", "space"] },
+    { "id": "spaceDamping", "label": "Stone Damping",    "cc": 19,  "range": [0, 1],     "curve": "linear", "tags": ["space", "tone"] },
+    { "id": "vowel",        "label": "Vowel Morph",      "cc": 20,  "range": [0, 1],     "curve": "linear", "tags": ["vowel", "brightness", "morph"] },
+    { "id": "breath",       "label": "Breath",           "cc": 21,  "range": [0, 1],     "curve": "linear", "tags": ["air", "texture"] },
+    { "id": "ensemble",     "label": "Ensemble Size",    "cc": 22,  "range": [0, 1],     "curve": "linear", "tags": ["humanize", "size", "detune"] },
+    { "id": "legato",       "label": "Legato",           "cc": 68,  "range": [0, 1],     "curve": "linear", "tags": ["legato", "phrasing"] },
+    { "id": "tailLevel",    "label": "Cathedral Level",  "cc": 91,  "range": [0, 1],     "curve": "linear", "tags": ["space", "reverb"] },
+    { "id": "spaceSize",    "label": "Cathedral Size",   "cc": 92,  "range": [0.2, 1.5], "curve": "linear", "tags": ["space"] }
+  ],
+  "presets": [],
+  "articulations": []
+}
