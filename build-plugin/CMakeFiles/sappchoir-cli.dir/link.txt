@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names "CMakeFiles/sappchoir-cli.dir/src/cli/main.cpp.o" -o sappchoir  libsappchoir_core.a SappSounds/libSappSounds.a

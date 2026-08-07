@@ -1,2 +1,0 @@
-/usr/bin/ar qc libsappchoir_core.a CMakeFiles/sappchoir_core.dir/src/core/ChoirEngine.cpp.o CMakeFiles/sappchoir_core.dir/src/core/VowelLayers.cpp.o CMakeFiles/sappchoir_core.dir/src/core/ChoirRender.cpp.o CMakeFiles/sappchoir_core.dir/src/core/SappLinkCCMap.cpp.o
-/usr/bin/ranlib libsappchoir_core.a

@@ -1,6 +1,7 @@
 #include "PluginEditor.h"
 
 #include "../core/VowelLayers.h"
+#include "SoundsPanel.h"
 
 namespace sappchoir {
 
@@ -387,6 +388,8 @@ SappChoirEditor::SappChoirEditor(SappChoirProcessor& processor)
     addAndMakeVisible(loadButton_);
     diagButton_.onClick = [this] { processor_.loadDiagnosticInstrument(); };
     addAndMakeVisible(diagButton_);
+    soundsButton_.onClick = [this] { openSoundsPanel(); };
+    addAndMakeVisible(soundsButton_);
 
     auto header = [&](juce::Label& label, const juce::String& text) {
         label.setText(text, juce::dontSendNotification);
@@ -453,6 +456,24 @@ SappChoirEditor::~SappChoirEditor()
 {
     processor_.onInstrumentChanged = nullptr;
     setLookAndFeel(nullptr);
+}
+
+SoundsPanel& SappChoirEditor::ensureSoundsPanel()
+{
+    if (soundsPanel_ == nullptr) {
+        soundsPanel_ = std::make_unique<SoundsPanel>(
+            processor_, [this] { soundsPanel_->setVisible(false); });
+        addChildComponent(*soundsPanel_);
+    }
+    return *soundsPanel_;
+}
+
+void SappChoirEditor::openSoundsPanel()
+{
+    auto& panel = ensureSoundsPanel();
+    panel.setBounds(getLocalBounds().reduced(14));
+    panel.setVisible(true);
+    panel.toFront(true);
 }
 
 void SappChoirEditor::chooseSfz()
@@ -596,6 +617,9 @@ void SappChoirEditor::resized()
     subtitle_.setBounds(s(21), s(42), s(240), s(16));
     loadButton_.setBounds(s(266), s(20), s(92), s(28));
     diagButton_.setBounds(s(364), s(20), s(84), s(28));
+    soundsButton_.setBounds(s(456), s(20), s(112), s(28));
+    if (soundsPanel_ != nullptr && soundsPanel_->isVisible())
+        soundsPanel_->setBounds(getLocalBounds().reduced(14));
     instrumentName_.setBounds(getWidth() - s(330), s(12), s(314), s(24));
     status_.setBounds(getWidth() - s(330), s(36), s(314), s(18));
 

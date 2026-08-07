@@ -1,6 +1,7 @@
 // SappChoirUiShot — renders the plugin editor offscreen and writes a PNG.
 // Used to verify UI changes without a screen-recording session.
 //   SappChoirUiShot [output.png]
+//   SappChoirUiShot --sounds [output.png]   (GET SOUNDS overlay open)
 //   SappChoirUiShot --cctest    (SappLink plugin-path proof: CC 20 morphs)
 
 #include <juce_audio_utils/juce_audio_utils.h>
@@ -81,8 +82,11 @@ public:
             return;
         }
 
-        const juce::String outPath = commandLine.trim().isNotEmpty()
-            ? commandLine.trim().unquoted() : juce::String("/tmp/sappchoir-ui.png");
+        const bool openSounds = commandLine.contains("--sounds");
+        const juce::String pathArg =
+            commandLine.replace("--sounds", "").trim().unquoted();
+        const juce::String outPath =
+            pathArg.isNotEmpty() ? pathArg : juce::String("/tmp/sappchoir-ui.png");
 
         processor = std::make_unique<sappchoir::SappChoirProcessor>();
         processor->prepareToPlay(48000.0, 512);
@@ -91,8 +95,15 @@ public:
         // Give the async built-in load (incl. vowel-layer generation) and
         // fonts time to settle, then hold a chord so the meter/voices are
         // alive in the shot.
-        juce::Timer::callAfterDelay(4000, [this, outPath]
+        juce::Timer::callAfterDelay(4000, [this, outPath, openSounds]
         {
+            // --sounds: click the header button so the overlay is in the shot.
+            if (openSounds)
+                for (auto* child : editor->getChildren())
+                    if (auto* button = dynamic_cast<juce::TextButton*>(child))
+                        if (button->getButtonText() == "GET SOUNDS")
+                            button->triggerClick();
+
             juce::AudioBuffer<float> buffer(2, 512);
             juce::MidiBuffer midi;
             midi.addEvent(juce::MidiMessage::noteOn(1, 48, 0.8f), 0);
@@ -105,7 +116,9 @@ public:
                 midi.clear();
             }
 
-            juce::Timer::callAfterDelay(300, [this, outPath]
+            // The sounds overlay scans the samples folder recursively; give
+            // that scan time to land before the shot.
+            juce::Timer::callAfterDelay(openSounds ? 2500 : 300, [this, outPath]
             {
                 auto snapshot = editor->createComponentSnapshot(editor->getLocalBounds(), true, 2.0f);
                 juce::File file(outPath);

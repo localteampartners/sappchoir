@@ -7,6 +7,8 @@
 
 #include "PluginProcessor.h"
 
+namespace sappchoir { class SoundsPanel; }
+
 namespace sappchoir {
 
 // ------------------------------------------------------------------ palette --
@@ -117,6 +119,11 @@ private:
     juce::Label title_, subtitle_, instrumentName_, status_;
     juce::TextButton loadButton_{"LOAD SFZ"};
     juce::TextButton diagButton_{"BUILT-IN"};
+    juce::TextButton soundsButton_{"GET SOUNDS"};
+
+    std::unique_ptr<SoundsPanel> soundsPanel_;
+    SoundsPanel& ensureSoundsPanel();
+    void openSoundsPanel();
 
     juce::Label voicesHeader_, vowelHeader_, ensembleHeader_, spaceHeader_;
     juce::OwnedArray<juce::TextButton> articulationChips_;

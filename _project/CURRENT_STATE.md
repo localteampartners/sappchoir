@@ -21,6 +21,11 @@
   Sonatina Mixed Chorus + oo→ah→oo vowel journey.
 - Sample libraries: Sonatina Chorus (local), freepats-synth-choir +
   legato-vocal registered in sappsounds fetch-library.sh (CC0, fetched).
+- GET SOUNDS panel (ported from sapporchestra): in-plugin one-click
+  download → extract → rescan of the three vocal libraries, plus an
+  installed-SFZ browser (~/Samples, shared Sapp samples root, filter +
+  double-click to load — loads route through vowel-layer generation).
+  UiShot `--sounds` renders the overlay for UI verification.
 
 ## Known issues
 

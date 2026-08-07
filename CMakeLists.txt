@@ -109,6 +109,7 @@ if(SAPPCHOIR_BUILD_PLUGIN)
   target_sources(SappChoirPlugin PRIVATE
     src/plugin/PluginProcessor.cpp
     src/plugin/PluginEditor.cpp
+    src/plugin/SoundsPanel.cpp
   )
   target_link_libraries(SappChoirPlugin PRIVATE
     sappchoir_core
@@ -132,6 +133,7 @@ if(SAPPCHOIR_BUILD_PLUGIN)
       tools/uishot/main.cpp
       src/plugin/PluginProcessor.cpp
       src/plugin/PluginEditor.cpp
+      src/plugin/SoundsPanel.cpp
     )
     target_include_directories(SappChoirUiShot PRIVATE src/plugin)
     target_link_libraries(SappChoirUiShot PRIVATE

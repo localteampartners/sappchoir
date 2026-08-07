@@ -6,6 +6,20 @@ Newest first. Format: `## YYYY-MM-DD — short title`, then bullets.
 
 ---
 
+## 2026-08-06 — GET SOUNDS: in-plugin library downloads
+
+- SoundsPanel ported from sapporchestra: GET SOUNDS header button opens a
+  cathedral-styled overlay with one-click download → extract (juce::URL +
+  juce::ZipFile; tar.gz via system tar) → progress → rescan.
+- Registry: FreePats Synth Pad Choir (7 MB, CC0), Legato Vocal Set
+  (160 MB, CC0), Sonatina Symphonic Orchestra chorus (2.6 GB, CC Sampling
+  Plus) — all zip, via codeload.github.com.
+- Installed-voices browser: recursive .sfz scan of the shared Sapp samples
+  root (skips includes/), category + text filter, double-click to load;
+  loads go through SappChoirProcessor::loadSfzInstrument, so downloaded
+  choirs get vowel-morph layers automatically.
+- UiShot: new `--sounds` flag snapshots the overlay.
+
 ## 2026-08-06 — v0.1.0: initial release
 
 - Core: ChoirEngine (CC1 dynamics, CC11 expression, breath, ensemble,

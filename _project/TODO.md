@@ -23,5 +23,7 @@ Short running task list. For "what exists *right now*," see [CURRENT_STATE.md](C
 
 ## Done (recent)
 
+- 2026-08-06 — GET SOUNDS panel: in-plugin vocal-library downloads +
+  installed-SFZ browser (ported from sapporchestra).
 - 2026-08-06 — v0.1.0: engine, vowel morph, cathedral, plugin UI, CLI,
   SappLink, tests, demo, repo published.
