@@ -6,6 +6,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 
 #include "PluginProcessor.h"
+#include "UpdateManager.h"
 
 namespace sappchoir { class SoundsPanel; }
 
@@ -137,6 +138,10 @@ private:
     juce::ToggleButton legato_{"legato"};
     std::unique_ptr<ChoirKeyboard> keyboard_;
 
+    juce::TextButton versionButton_{"v" JucePlugin_VersionString};
+    juce::TextButton updateButton_{"UPDATE"};
+    std::unique_ptr<UpdateManager> updater_;
+    void refreshUpdateUi();
     juce::Label voicesLabel_;
     float meterL_ = 0.0f, meterR_ = 0.0f;
     juce::Rectangle<int> meterArea_;

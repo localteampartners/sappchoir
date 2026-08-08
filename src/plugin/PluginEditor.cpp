@@ -442,6 +442,29 @@ SappChoirEditor::SappChoirEditor(SappChoirProcessor& processor)
     voicesLabel_.setColour(juce::Label::textColourId, palette::dim);
     addAndMakeVisible(voicesLabel_);
 
+    // --- in-plugin updater --------------------------------------------------
+    versionButton_.setTooltip("Click to check for updates");
+    versionButton_.onClick = [this] { updater_->checkForUpdate(); };
+    addAndMakeVisible(versionButton_);
+    updater_ = std::make_unique<UpdateManager>();
+    updater_->onStateChanged = [this] { refreshUpdateUi(); };
+    updateButton_.setVisible(false);
+    updateButton_.onClick = [this] {
+        if (updater_->state() == UpdateManager::State::UpdateAvailable)
+            updater_->installUpdate();
+    };
+    addAndMakeVisible(updateButton_);
+    {
+        auto& settings = sappSharedSettings();
+        const auto last = settings.getValue("lastUpdateCheck-sappchoir", "0").getLargeIntValue();
+        const auto now = juce::Time::currentTimeMillis();
+        if (now - last > juce::int64(24) * 3600 * 1000) {
+            settings.setValue("lastUpdateCheck-sappchoir", juce::String(now));
+            settings.saveIfNeeded();
+            updater_->checkForUpdate();
+        }
+    }
+
     processor_.onInstrumentChanged = [this] { rebuildArticulationChips(); };
     rebuildArticulationChips();
 
@@ -608,6 +631,38 @@ void SappChoirEditor::paint(juce::Graphics& g)
     }
 }
 
+void SappChoirEditor::refreshUpdateUi()
+{
+    using State = UpdateManager::State;
+    const auto state = updater_->state();
+    switch (state) {
+        case State::UpdateAvailable:
+            updateButton_.setButtonText("UPDATE " + updater_->latestTag());
+            updateButton_.setEnabled(true);
+            updateButton_.setVisible(true);
+            break;
+        case State::Downloading:
+        case State::Installing:
+            updateButton_.setButtonText(state == State::Downloading ? "DOWNLOADING..."
+                                                                     : "INSTALLING...");
+            updateButton_.setEnabled(false);
+            updateButton_.setVisible(true);
+            break;
+        case State::Installed:
+            updateButton_.setButtonText("INSTALLED - REOPEN");
+            updateButton_.setEnabled(false);
+            updateButton_.setVisible(true);
+            break;
+        default:
+            updateButton_.setVisible(false);
+            break;
+    }
+    versionButton_.setButtonText(state == State::Idle || state == State::UpdateAvailable
+                                     ? juce::String("v" JucePlugin_VersionString)
+                                     : updater_->statusText());
+    resized();
+}
+
 void SappChoirEditor::resized()
 {
     const float scale = float(getWidth()) / 940.0f;
@@ -660,6 +715,8 @@ void SappChoirEditor::resized()
     keyboard_->setKeyWidth(float(keyboard_->getWidth()) / 56.5f);
 
     voicesLabel_.setBounds(s(14), s(572), s(90), s(20));
+    versionButton_.setBounds(s(270), s(570), s(170), s(24));
+    updateButton_.setBounds(s(446), s(569), s(150), s(26));
     meterArea_ = {s(110), s(576), s(150), s(14)};
     limiter_.setBounds(getWidth() - s(150), s(572), s(90), s(24));
 }

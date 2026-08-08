@@ -65,3 +65,13 @@ TEST_CASE("render produces audio and a long sacred tail", "[render]")
         lateSum += std::abs(out.left[i]);
     CHECK(lateSum / 24000.0 > 1.0e-5);
 }
+
+#include "core/VersionCompare.h"
+
+TEST_CASE("updater version comparison", "[updater]")
+{
+    CHECK(sapp::choir::isNewerVersion("v0.3.1", "0.3.0"));
+    CHECK(sapp::choir::isNewerVersion("v1.0.0", "0.9.9"));
+    CHECK_FALSE(sapp::choir::isNewerVersion("v0.3.0", "0.3.0"));
+    CHECK_FALSE(sapp::choir::isNewerVersion("v0.2.9", "0.3.0"));
+}

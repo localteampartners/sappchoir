@@ -40,3 +40,9 @@ python3 scripts/make_choir_demo.py    # → /tmp/sappchoir-demo.wav
 ```
 
 No deploy target: this is a local-build instrument. Rollback = git.
+
+## Release rule (in-plugin updater)
+
+Bump `project(SappChoir VERSION X.Y.Z)` in CMakeLists.txt to match every
+release tag — the in-plugin updater compares JucePlugin_VersionString
+against the latest GitHub tag, so the two MUST stay in sync.
