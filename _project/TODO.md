@@ -27,3 +27,6 @@ Short running task list. For "what exists *right now*," see [CURRENT_STATE.md](C
   installed-SFZ browser (ported from sapporchestra).
 - 2026-08-06 — v0.1.0: engine, vowel morph, cathedral, plugin UI, CLI,
   SappLink, tests, demo, repo published.
+
+- [ ] One manual UPDATE-button click on a Windows machine (rename-trick
+      .vst3 swap is untested on real Windows; macOS path verified).

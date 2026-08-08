@@ -36,6 +36,12 @@
 - `src/cli/` — `sappchoir` binary; JSON contracts in docs/agent_api.md.
 - `tools/uishot/` — offscreen editor PNG + `--cctest` plugin-path proof.
 - `tests/` — 28 unit tests incl. SappLink manifest drift guard.
+- `src/plugin/UpdateManager.h` — in-plugin updater (background
+  thread): GitHub latest-release check vs JucePlugin_VersionString,
+  platform-asset download, install (SappChoir.vst3/.component on
+  macOS + xattr -rc; Windows rename-trick swap), standalone
+  self-relaunch on macOS. `src/core/VersionCompare.h` does the
+  semver-ish tag comparison.
 
 ## Data flow
 

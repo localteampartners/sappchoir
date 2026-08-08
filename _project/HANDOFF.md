@@ -4,5 +4,5 @@
 
 Work in flight: none
 
-GET SOUNDS panel shipped 2026-08-06 (after v0.1.0). Cold open: read
+v0.3.0 shipped 2026-08-07: in-plugin updater (+ GET SOUNDS from
 _project/README.md + CURRENT_STATE.md, then TODO.md.
