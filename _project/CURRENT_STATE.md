@@ -6,6 +6,11 @@
 
 ---
 
+- In-plugin updater (v0.3.0): footer version button checks GitHub daily
+  (or on click); UPDATE button downloads + installs the newest release
+  (macOS install + quarantine clear, Windows rename-trick swap).
+  CMake project VERSION must be bumped with every release tag.
+
 ## What's built and working
 
 - v0.1.0 complete: core engine, vowel morphing (generated formant layers on
