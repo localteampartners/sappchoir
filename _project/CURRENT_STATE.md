@@ -2,7 +2,7 @@
 
 <!-- UPDATE WHEN: a feature ships, a deploy happens, something breaks, or something gets fixed. This file answers "what's the project like *right now*?" -->
 
-**Last verified:** 2026-08-06
+**Last verified:** 2026-08-09
 
 ---
 
@@ -30,7 +30,13 @@
   deterministic (same seed ⇒ bit-identical WAV).
 - SappLink v1: manifest in sapptune, vendored copy + drift-guard test; CC
   20 vowel / 21 breath / 22 ensemble / space CCs; CC1/11/64 engine-native.
-- 28 Catch2 tests green; `./verify.sh` passes (<60 s warm).
+- Host-automatable SFZ selection (sapptune #20): `instrument` choice param
+  (appended last, automation indices hold) enumerates the library via
+  `<samplesRoot>/.sapp-sfz-index.json` (ordering contract in
+  src/core/SfzLibrary, case-insensitive by label); bank-select + program
+  change loads by entry index; state stays path-based; CLI `sfz-index`
+  prints name→choice→normalized; rescans take effect next instantiation.
+- 36 Catch2 tests green; `./verify.sh` passes (<60 s warm).
 - Demo: `scripts/make_choir_demo.py` renders an 8-bar SATB progression with
   Sonatina Mixed Chorus + oo→ah→oo vowel journey.
 - Sample libraries: Sonatina Chorus (local), freepats-synth-choir +

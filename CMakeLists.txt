@@ -42,6 +42,7 @@ add_library(sappchoir_core STATIC
   src/core/VowelLayers.cpp
   src/core/ChoirRender.cpp
   src/core/SappLinkCCMap.cpp
+  src/core/SfzLibrary.cpp
 )
 target_include_directories(sappchoir_core PUBLIC src)
 target_link_libraries(sappchoir_core PUBLIC Sapp::Sounds)
@@ -70,6 +71,7 @@ if(SAPPCHOIR_BUILD_TESTS)
     tests/unit/test_choir_engine.cpp
     tests/unit/test_render.cpp
     tests/unit/test_sapplink.cpp
+    tests/unit/test_sfz_library.cpp
   )
   target_link_libraries(SappChoirTests PRIVATE sappchoir_core Catch2::Catch2WithMain)
   target_compile_definitions(SappChoirTests PRIVATE
@@ -142,6 +144,8 @@ if(SAPPCHOIR_BUILD_PLUGIN)
       juce::juce_dsp
       juce::juce_recommended_config_flags
     )
-    target_compile_definitions(SappChoirUiShot PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+    target_compile_definitions(SappChoirUiShot PRIVATE
+      JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0
+      JUCE_MODAL_LOOPS_PERMITTED=1)  # --sfztest pumps the dispatch loop
   endif()
 endif()

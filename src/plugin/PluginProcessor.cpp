@@ -5,6 +5,7 @@
 #include "../core/SappLinkCCMap.h"
 #include "../core/VowelLayers.h"
 #include "PluginEditor.h"
+#include "SoundsPanel.h"
 
 namespace sappchoir {
 
@@ -15,7 +16,8 @@ namespace {
 constexpr int kMaxArticulations = 16;
 }
 
-juce::AudioProcessorValueTreeState::ParameterLayout SappChoirProcessor::makeLayout()
+juce::AudioProcessorValueTreeState::ParameterLayout
+SappChoirProcessor::makeLayout(std::vector<sapp::sfzlib::Entry>& outLibrary)
 {
     using P = juce::AudioParameterFloat;
     using Range = juce::NormalisableRange<float>;
@@ -55,13 +57,28 @@ juce::AudioProcessorValueTreeState::ParameterLayout SappChoirProcessor::makeLayo
         juce::StringArray{"Draft", "Normal"}, 1));
     layout.add(std::make_unique<juce::AudioParameterInt>(
         juce::ParameterID{"articulation", 1}, "Articulation", 0, kMaxArticulations - 1, 0));
+
+    // APPENDED LAST (sapptune issue #20) so every pre-existing automation
+    // index holds. Choice 0 keeps whatever is loaded; choice k loads library
+    // entry k-1 (case-insensitive sort order — see SfzLibrary.h). The list is
+    // fixed for this instance; a rescan shows up on the next instantiation.
+    outLibrary = sapp::sfzlib::loadOrScan(sapp::sfzlib::resolveRoot(
+        SoundsPanel::samplesRoot().getFullPathName().toStdString()));
+    juce::StringArray instrumentChoices;
+    instrumentChoices.add("(keep current)");
+    for (const auto& entry : outLibrary)
+        instrumentChoices.add(juce::String::fromUTF8(entry.label.c_str()));
+    if (outLibrary.empty())
+        instrumentChoices.add("(no SFZ library found)");  // avoid a 1-step param
+    layout.add(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{"instrument", 1}, "Instrument", instrumentChoices, 0));
     return layout;
 }
 
 SappChoirProcessor::SappChoirProcessor()
     : juce::AudioProcessor(BusesProperties().withOutput(
           "Output", juce::AudioChannelSet::stereo(), true)),
-      apvts_(*this, nullptr, "SappChoir", makeLayout())
+      apvts_(*this, nullptr, "SappChoir", makeLayout(sfzLibrary_))
 {
     auto raw = [this](const char* id) { return apvts_.getRawParameterValue(id); };
     pVowel_ = raw("vowel");
@@ -89,7 +106,73 @@ SappChoirProcessor::SappChoirProcessor()
     for (size_t i = 0; i < table.size(); ++i)
         ccSlews_[i].parameter = apvts_.getParameter(table[i].paramId);
 
+    // Host-automatable SFZ selection: the callback may fire on the audio
+    // thread, so it only stores an index; the timer applies it on the
+    // message thread.
+    apvts_.addParameterListener("instrument", this);
+    startTimerHz(30);
+
     loadDiagnosticInstrument();
+}
+
+// --------------------------------------------- `instrument` choice param --
+
+void SappChoirProcessor::parameterChanged(const juce::String& parameterId,
+                                          float newValue)
+{
+    if (parameterId != juce::StringRef("instrument") || applyingInstrumentChoice_)
+        return;
+    pendingInstrumentChoice_.store(int(newValue + 0.5f));
+}
+
+void SappChoirProcessor::timerCallback()
+{
+    // MIDI program select first, then an explicit parameter move: when both
+    // land in the same tick the parameter (the deliberate host move) wins.
+    const int programSelect = pendingProgramSelect_.exchange(-1);
+    if (programSelect >= 0)
+        applyInstrumentChoice(programSelect + 1);  // entry -> choice
+    const int choice = pendingInstrumentChoice_.exchange(-1);
+    if (choice >= 0)
+        applyInstrumentChoice(choice);
+}
+
+void SappChoirProcessor::applyInstrumentChoice(int choiceIndex)
+{
+    if (choiceIndex <= 0 || choiceIndex > int(sfzLibrary_.size()))
+        return;  // "(keep current)" / placeholder / out of range
+    const auto& entry = sfzLibrary_[size_t(choiceIndex - 1)];
+    const juce::File file(juce::String::fromUTF8(entry.path.c_str()));
+    if (file.getFullPathName() == currentInstrumentPath())
+        return;  // already loaded
+    if (!file.existsAsFile()) {
+        // Graceful miss: the library changed since the index was written.
+        const juce::ScopedLock sl(loadLock_);
+        loadStatus_ = "Missing: " + file.getFullPathName();
+        if (onInstrumentChanged) onInstrumentChanged();
+        return;
+    }
+    loadSfzInstrument(file);
+}
+
+void SappChoirProcessor::syncInstrumentParameter(const juce::String& path)
+{
+    auto* parameter = apvts_.getParameter("instrument");
+    if (parameter == nullptr) return;
+    int choice = 0;  // "" / unknown path -> "(keep current)"
+    const auto pathStd = path.toStdString();
+    for (size_t i = 0; i < sfzLibrary_.size(); ++i)
+        if (sfzLibrary_[i].path == pathStd) { choice = int(i) + 1; break; }
+    applyingInstrumentChoice_ = true;
+    parameter->setValueNotifyingHost(parameter->convertTo0to1(float(choice)));
+    applyingInstrumentChoice_ = false;
+}
+
+bool SappChoirProcessor::rescanSfzLibrary() const
+{
+    const auto root = sapp::sfzlib::resolveRoot(
+        SoundsPanel::samplesRoot().getFullPathName().toStdString());
+    return sapp::sfzlib::writeIndex(root, sapp::sfzlib::scan(root));
 }
 
 void SappChoirProcessor::handleSappLinkCc(int ccNumber, int ccValue)
@@ -125,7 +208,11 @@ void SappChoirProcessor::advanceCcSlews(int numSamples)
     }
 }
 
-SappChoirProcessor::~SappChoirProcessor() = default;
+SappChoirProcessor::~SappChoirProcessor()
+{
+    stopTimer();
+    apvts_.removeParameterListener("instrument", this);
+}
 
 void SappChoirProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
@@ -216,10 +303,24 @@ void SappChoirProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             e.type = MidiEvent::Type::Controller;
             e.note = uint8_t(msg.getControllerNumber());
             e.value = uint8_t(msg.getControllerValue());
+            // Bank select arms the next program change:
+            // entry = ((CC0 << 7) | CC32) * 128 + program (sapptune #20).
+            if (msg.getControllerNumber() == 0)
+                bankMsb_ = uint8_t(msg.getControllerValue());
+            else if (msg.getControllerNumber() == 32)
+                bankLsb_ = uint8_t(msg.getControllerValue());
             // SappLink CC-in (any channel): mapped CCs also steer parameters.
             // The event still reaches the engine below (vowel crossfades, SFZ
             // CC conditions, native CC1/CC11/CC64 behavior stay untouched).
             handleSappLinkCc(msg.getControllerNumber(), msg.getControllerValue());
+        } else if (msg.isProgramChange()) {
+            // Program change selects an SFZ library entry (single-timbral:
+            // any channel); the load happens on the message thread (timer).
+            const int bank = (int(bankMsb_) << 7) | int(bankLsb_);
+            const int entry = bank * 128 + msg.getProgramChangeNumber();
+            if (entry < int(sfzLibrary_.size()))
+                pendingProgramSelect_.store(entry);
+            continue;  // consumed; the engine has no program-change concept
         } else if (msg.isPitchWheel()) {
             e.type = MidiEvent::Type::PitchBend;
             e.bend14 = int16_t(msg.getPitchWheelValue() - 8192);
@@ -312,6 +413,9 @@ void SappChoirProcessor::finishLoad(sapp::sounds::LoadResult result,
                           : juce::String(result.missingSamples.size()) + " samples missing";
         lastArticulationParam_ = -1;  // re-apply articulation on next block
     }
+    // Reflect the loaded instrument in the `instrument` parameter (guarded —
+    // this must not schedule another load).
+    syncInstrumentParameter(sfzPath_);
     if (onInstrumentChanged) onInstrumentChanged();
 }
 
@@ -367,7 +471,14 @@ void SappChoirProcessor::setStateInformation(const void* data, int sizeInBytes)
     if (auto xml = getXmlFromBinary(data, sizeInBytes)) {
         auto state = juce::ValueTree::fromXml(*xml);
         if (!state.isValid()) return;
+        // The chosen SFZ persists BY PATH (indices shift when the library
+        // changes): suppress the `instrument` choice value coming back with
+        // the tree so it cannot race the path-based load below. finishLoad
+        // re-syncs the parameter once the real instrument is in.
+        applyingInstrumentChoice_ = true;
         apvts_.replaceState(state);
+        applyingInstrumentChoice_ = false;
+        pendingInstrumentChoice_.store(-1);
         const juce::String path = state.getProperty("sfzPath", "").toString();
         if (path.isNotEmpty() && juce::File(path).existsAsFile())
             loadSfzInstrument(juce::File(path));
