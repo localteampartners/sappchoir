@@ -11,6 +11,9 @@ namespace sapp::choir::sapplink {
 const std::array<CCMapping, kNumMappings>& mappings()
 {
     static const std::array<CCMapping, kNumMappings> table { {
+        // CC 3 is the suite-wide `clean` convention (sappsynth / sappkeys /
+        // sapporchestra / sappkit all use it): 0 = fully modeled, 1 = clinical.
+        { 3,  "clean",        &ChoirParams::clean,        0.0f,   1.0f,  Curve::Linear },
         { 7,  "masterGain",   &ChoirParams::masterGainDb, -24.0f, 12.0f, Curve::Linear },
         { 14, "earlyLevel",   &ChoirParams::earlyLevel,   0.0f,   1.0f,  Curve::Linear },
         { 15, "spaceDecay",   &ChoirParams::spaceDecay,   1.0f,   20.0f, Curve::Log },

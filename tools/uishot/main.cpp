@@ -64,12 +64,16 @@ public:
         processor->prepareToPlay(48000.0, 512);
         pumpUntil([this] { return !processor->isLoading(); }, 10000);  // built-in load
 
-        // --- A. parameter table: existing order intact, `instrument` last --
+        // --- A. parameter table: existing order intact, additions appended --
+        // `instrument` (sapptune #20), then `clean` (CC 3, sappchoir #1), then
+        // the read-only `libraryReady` readout. Every pre-existing automation
+        // index holds because nothing is ever inserted before them.
         const char* expectedIds[] = {"vowel", "dynamics", "expression", "breath",
                                      "ensemble", "width", "earlyLevel", "tailLevel",
                                      "spaceSize", "spaceDecay", "spaceDamping",
                                      "legato", "masterGain", "limiter", "quality",
-                                     "articulation", "instrument"};
+                                     "articulation", "instrument", "clean",
+                                     "libraryReady"};
         const auto& params = processor->getParameters();
         bool tableOk = params.size() == int(std::size(expectedIds));
         for (int i = 0; tableOk && i < params.size(); ++i) {
@@ -79,7 +83,8 @@ public:
                 std::printf("  param %d is %s, expected %s\n", i,
                             withId ? withId->paramID.toRawUTF8() : "?", expectedIds[i]);
         }
-        sfzCheck(tableOk, "16 pre-existing params unchanged, `instrument` appended last");
+        sfzCheck(tableOk,
+                 "16 pre-existing params unchanged; instrument/clean/libraryReady appended");
 
         // --- B. choice list mirrors the sorted library ---------------------
         auto* choice = dynamic_cast<juce::AudioParameterChoice*>(

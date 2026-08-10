@@ -89,6 +89,7 @@ Full parameter schema: `{"params":[{name,id,min,max,default,cc,doc}],
 | space_damping | spaceDamping | 0–1 | 0.55 | 19 | stone → drapes absorption |
 | legato | legato | 0–1 | 1.0 | 68 | slurred lines (chord-safe) |
 | master_gain_db | masterGain | −24–12 | 0 | 7 | output gain |
+| clean | clean | 0–1 | 0.0 | 3 | 0 = every modeled imperfection as designed, 1 = none |
 
 **SappLink CC-in:** the MIDI CC column is a live contract — CCs embedded in
 a rendered `.mid` (or played into the plugin) move these parameters, with

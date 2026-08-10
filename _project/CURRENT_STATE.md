@@ -2,9 +2,30 @@
 
 <!-- UPDATE WHEN: a feature ships, a deploy happens, something breaks, or something gets fixed. This file answers "what's the project like *right now*?" -->
 
-**Last verified:** 2026-08-09
+**Last verified:** 2026-08-10
 
 ---
+
+## Shipped 2026-08-10 — v0.7.0 (headless silence fixed, issue #1)
+
+- Instrument loading no longer touches the JUCE message thread. The
+  processor owns a **loader thread**; parameter selections, program
+  changes, state restores and the construction diagnostic are queued
+  `LoadJob`s installed there. Previously `MessageManager::callAsync` +
+  a `juce::Timer` owned the whole path, so in a headless host (which has a
+  MessageManager nobody pumps) NOTHING loaded — not even the built-in
+  choir — and SappChoir rendered digital silence. That is the sappradio
+  station's -61.2 dBFS report; the residue it measured was the downstream
+  chain, not this plugin.
+- Read-only `libraryReady` host parameter: poll it instead of a blind
+  settle window. Diagnostic log lines `SappChoir-build:`,
+  `SappChoir-instrument:` (incl. `MISSING`), `SappChoir-audio-source:` —
+  host logger, stderr on Windows, and `$SAPP_CHOIR_LOG`.
+- Suite-wide `clean` parameter (id `clean`, CC 3, default 0) scales the
+  breath-noise bed and the ensemble humanization.
+- `tools/headless/` — the `sappchoir-headless` station harness (no editor,
+  no dispatch loop). Its `selftest` (14 checks) is the regression, run by
+  CTest and by `./verify.sh`, which now builds the plugin target too.
 
 ## Shipped 2026-08-07 — v0.3.0 (in-plugin updater)
 
@@ -29,14 +50,16 @@
 - Agent CLI: inspect/validate/params/vowels/scan/render — JSON, seeded,
   deterministic (same seed ⇒ bit-identical WAV).
 - SappLink v1: manifest in sapptune, vendored copy + drift-guard test; CC
-  20 vowel / 21 breath / 22 ensemble / space CCs; CC1/11/64 engine-native.
+  3 clean / 20 vowel / 21 breath / 22 ensemble / space CCs; CC1/11/64
+  engine-native.
 - Host-automatable SFZ selection (sapptune #20): `instrument` choice param
   (appended last, automation indices hold) enumerates the library via
   `<samplesRoot>/.sapp-sfz-index.json` (ordering contract in
   src/core/SfzLibrary, case-insensitive by label); bank-select + program
   change loads by entry index; state stays path-based; CLI `sfz-index`
   prints name→choice→normalized; rescans take effect next instantiation.
-- 36 Catch2 tests green; `./verify.sh` passes (<60 s warm).
+- 40 Catch2 tests green plus the 14-check headless selftest;
+  `./verify.sh` passes (builds core+CLI+tests AND the plugin+harness).
 - Demo: `scripts/make_choir_demo.py` renders an 8-bar SATB progression with
   Sonatina Mixed Chorus + oo→ah→oo vowel journey.
 - Sample libraries: Sonatina Chorus (local), freepats-synth-choir +

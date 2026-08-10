@@ -16,6 +16,20 @@ namespace {
 constexpr int kMaxArticulations = 16;
 }
 
+void logLine(const juce::String& message)
+{
+    juce::Logger::writeToLog(message);
+#if JUCE_WINDOWS
+    // JUCE's fallback logger is OutputDebugString on Windows — invisible to a
+    // station box redirecting the host's output. stderr is what it greps.
+    std::fputs((message + "\n").toRawUTF8(), stderr);
+    std::fflush(stderr);
+#endif
+    if (const char* path = std::getenv(kLogEnvVar))
+        if (path[0] != 0)
+            juce::File(juce::String::fromUTF8(path)).appendText(message + "\n");
+}
+
 juce::AudioProcessorValueTreeState::ParameterLayout
 SappChoirProcessor::makeLayout(std::vector<sapp::sfzlib::Entry>& outLibrary)
 {
@@ -72,6 +86,14 @@ SappChoirProcessor::makeLayout(std::vector<sapp::sfzlib::Entry>& outLibrary)
         instrumentChoices.add("(no SFZ library found)");  // avoid a 1-step param
     layout.add(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{"instrument", 1}, "Instrument", instrumentChoices, 0));
+
+    // Suite-wide `clean` convention (CC 3): 0 = every modeled imperfection as
+    // designed, 1 = none. Appended AFTER `instrument` so no pre-existing
+    // automation index moves. Default 0 keeps the historical sound — and, as
+    // issue #1's postmortem demands, no parameter of this plugin may default
+    // to a value that silences it.
+    layout.add(std::make_unique<P>(juce::ParameterID{"clean", 1}, "Clean",
+                                   Range{0.0f, 1.0f, 0.001f}, 0.0f));
     return layout;
 }
 
@@ -97,6 +119,7 @@ SappChoirProcessor::SappChoirProcessor()
     pLimiter_ = raw("limiter");
     pQuality_ = raw("quality");
     pArticulation_ = raw("articulation");
+    pClean_ = raw("clean");
 
     eventScratch_.reserve(512);
 
@@ -106,11 +129,33 @@ SappChoirProcessor::SappChoirProcessor()
     for (size_t i = 0; i < table.size(); ++i)
         ccSlews_[i].parameter = apvts_.getParameter(table[i].paramId);
 
+    // Readiness readout (issue #1): a headless host polls this instead of
+    // guessing a settle window. Outside the APVTS on purpose — see the
+    // declaration. Appended last, after every APVTS parameter.
+    libraryReady_ = new juce::AudioParameterBool(
+        juce::ParameterID{"libraryReady", 1}, "Library Ready", false,
+        juce::AudioParameterBoolAttributes().withAutomatable(false));
+    addParameter(libraryReady_);
+
     // Host-automatable SFZ selection: the callback may fire on the audio
-    // thread, so it only stores an index; the timer applies it on the
-    // message thread.
+    // thread, so it only stores an index; the LOADER THREAD applies it.
     apvts_.addParameterListener("instrument", this);
+
+    // The loader thread owns every instrument install. Started before the
+    // construction diagnostic is queued so nothing waits on the host.
+    loaderThread_ = std::thread([this] { loaderLoop(); });
+
+    // The 30 Hz timer is an editor convenience ONLY (it fires the
+    // onInstrumentChanged hook on the message thread). Nothing about loading
+    // depends on it — see the threading note in the header.
     startTimerHz(30);
+
+    // Which build did the host just load, and what is it enumerating? One
+    // line at construction turns "the wrong sound came out" from guesswork
+    // into a log grep.
+    logLine("SappChoir-build: version=" SAPPCHOIR_VERSION
+            " root=\"" + SoundsPanel::samplesRoot().getFullPathName()
+            + "\" instruments=" + juce::String(int(sfzLibrary_.size())));
 
     loadDiagnosticInstrument();
 }
@@ -120,21 +165,147 @@ SappChoirProcessor::SappChoirProcessor()
 void SappChoirProcessor::parameterChanged(const juce::String& parameterId,
                                           float newValue)
 {
-    if (parameterId != juce::StringRef("instrument") || applyingInstrumentChoice_)
+    if (parameterId != juce::StringRef("instrument")
+        || applyingInstrumentChoice_.load(std::memory_order_acquire))
         return;
     pendingInstrumentChoice_.store(int(newValue + 0.5f));
+    // Not ready from the instant the host asks for a different instrument —
+    // otherwise a host that writes the parameter and immediately polls would
+    // read the PREVIOUS instrument's "ready" and render too early.
+    if (libraryReady_ != nullptr && libraryReady_->get())
+        *libraryReady_ = false;
+    queueCv_.notify_all();
 }
 
 void SappChoirProcessor::timerCallback()
 {
-    // MIDI program select first, then an explicit parameter move: when both
-    // land in the same tick the parameter (the deliberate host move) wins.
-    const int programSelect = pendingProgramSelect_.exchange(-1);
-    if (programSelect >= 0)
-        applyInstrumentChoice(programSelect + 1);  // entry -> choice
-    const int choice = pendingInstrumentChoice_.exchange(-1);
-    if (choice >= 0)
-        applyInstrumentChoice(choice);
+    // Editor convenience ONLY. Loading does not run here (see LoadJob).
+    if (instrumentChangedFlag_.exchange(false) && onInstrumentChanged)
+        onInstrumentChanged();
+}
+
+// The loader thread: the one place instruments are installed. Runs whether or
+// not the host has a message loop, which is the entire point (issue #1).
+void SappChoirProcessor::loaderLoop()
+{
+    while (!loaderStop_.load(std::memory_order_acquire)) {
+        // MIDI program select first, then an explicit parameter move: when
+        // both land in the same tick the parameter (the deliberate host move)
+        // wins because it is enqueued last.
+        const int programSelect = pendingProgramSelect_.exchange(-1);
+        if (programSelect >= 0)
+            applyInstrumentChoice(programSelect + 1);  // entry -> choice
+        const int choice = pendingInstrumentChoice_.exchange(-1);
+        if (choice >= 0)
+            applyInstrumentChoice(choice);
+
+        LoadJob job;
+        bool haveJob = false;
+        {
+            std::lock_guard<std::mutex> lock(queueMutex_);
+            if (!loadQueue_.empty()) {
+                job = std::move(loadQueue_.front());
+                loadQueue_.pop_front();
+                haveJob = true;
+            }
+        }
+        if (haveJob) {
+            performLoad(std::move(job));
+            jobsOutstanding_.fetch_sub(1);
+            loading_.store(jobsOutstanding_.load() > 0);
+            publishReadiness();
+            continue;
+        }
+
+        loading_.store(false);
+        publishReadiness();
+        logAudioSourceIfNeeded();
+        std::unique_lock<std::mutex> lock(queueMutex_);
+        queueCv_.wait_for(lock, std::chrono::milliseconds(5));
+    }
+}
+
+void SappChoirProcessor::enqueueLoad(LoadJob job)
+{
+    jobsOutstanding_.fetch_add(1);
+    loading_.store(true);
+    if (libraryReady_ != nullptr && libraryReady_->get())
+        *libraryReady_ = false;
+    {
+        std::lock_guard<std::mutex> lock(queueMutex_);
+        loadQueue_.push_back(std::move(job));
+    }
+    queueCv_.notify_all();
+}
+
+void SappChoirProcessor::performLoad(LoadJob job)
+{
+    if (job.generation != loadGeneration_.load())
+        return;  // a newer load was queued before this one started
+
+    if (job.kind == LoadJob::Kind::Diagnostic) {
+        // Built-in: the diagnostic instrument refiltered into vowel layers.
+        sapp::sounds::LoadResult result;
+        result.instrument =
+            makeVowelInstrument(sapp::sounds::makeDiagnosticInstrument(), kVowelCc);
+        result.ok = result.instrument != nullptr;
+        finishLoad(std::move(result), {}, job.generation, job.syncParameter);
+        return;
+    }
+
+    sapp::sounds::InstrumentLoader loader;
+    auto result = loader.loadSfz(job.path.toStdString());
+    // Vowel morph: generated formant layers unless the library ships its own
+    // crossfades on the Vowel CC.
+    if (result.ok && result.instrument != nullptr)
+        result.instrument = makeVowelInstrument(result.instrument, kVowelCc);
+    finishLoad(std::move(result), job.path, job.generation, job.syncParameter);
+}
+
+void SappChoirProcessor::publishReadiness()
+{
+    if (libraryReady_ == nullptr) return;
+    const bool ready = jobsOutstanding_.load() == 0
+                       && pendingInstrumentChoice_.load() < 0
+                       && pendingProgramSelect_.load() < 0
+                       && installCount_.load() > 0;
+    if (libraryReady_->get() != ready)
+        *libraryReady_ = ready;
+}
+
+bool SappChoirProcessor::libraryReady() const
+{
+    return libraryReady_ != nullptr && libraryReady_->get();
+}
+
+void SappChoirProcessor::logInstalled(const juce::String& what, bool ok)
+{
+    logLine(juce::String("SappChoir-instrument: ") + (ok ? "loaded" : "FAILED")
+            + " source=\"" + what + "\" build=" SAPPCHOIR_VERSION);
+}
+
+void SappChoirProcessor::logAudioSourceIfNeeded()
+{
+    // Voices started from silence: name the instrument that produced them.
+    // This is the line that makes "the plugin is playing its default sound"
+    // — or nothing at all — visible in the wild instead of only audible.
+    if (!audioBatchStarted_.exchange(false)) return;
+    const double nowMs = juce::Time::getMillisecondCounterHiRes();
+    if (nowMs - lastAudioSourceLogMs_ < 3000.0) return;
+    lastAudioSourceLogMs_ = nowMs;
+
+    juce::String source, name;
+    {
+        const juce::ScopedLock sl(loadLock_);
+        source = sfzPath_;
+        name = instrumentName_;
+    }
+    if (source.isEmpty())
+        // ASCII only: these lines end up in host logs with every encoding.
+        source = "DIAGNOSTIC(no SFZ loaded - the built-in choir is sounding)";
+    logLine("SappChoir-audio-source: instrument=\"" + source
+            + "\" name=\"" + name + "\" build=" SAPPCHOIR_VERSION
+            + " ready=" + juce::String(libraryReady() ? 1 : 0));
 }
 
 void SappChoirProcessor::applyInstrumentChoice(int choiceIndex)
@@ -147,9 +318,14 @@ void SappChoirProcessor::applyInstrumentChoice(int choiceIndex)
         return;  // already loaded
     if (!file.existsAsFile()) {
         // Graceful miss: the library changed since the index was written.
-        const juce::ScopedLock sl(loadLock_);
-        loadStatus_ = "Missing: " + file.getFullPathName();
-        if (onInstrumentChanged) onInstrumentChanged();
+        // Say so — a silent no-op here is exactly how this class of bug hides.
+        {
+            const juce::ScopedLock sl(loadLock_);
+            loadStatus_ = "Missing: " + file.getFullPathName();
+        }
+        logLine("SappChoir-instrument: MISSING choice=" + juce::String(choiceIndex)
+                + " path=\"" + file.getFullPathName() + "\" build=" SAPPCHOIR_VERSION);
+        instrumentChangedFlag_.store(true);
         return;
     }
     loadSfzInstrument(file);
@@ -163,9 +339,9 @@ void SappChoirProcessor::syncInstrumentParameter(const juce::String& path)
     const auto pathStd = path.toStdString();
     for (size_t i = 0; i < sfzLibrary_.size(); ++i)
         if (sfzLibrary_[i].path == pathStd) { choice = int(i) + 1; break; }
-    applyingInstrumentChoice_ = true;
+    applyingInstrumentChoice_.store(true, std::memory_order_release);
     parameter->setValueNotifyingHost(parameter->convertTo0to1(float(choice)));
-    applyingInstrumentChoice_ = false;
+    applyingInstrumentChoice_.store(false, std::memory_order_release);
 }
 
 bool SappChoirProcessor::rescanSfzLibrary() const
@@ -212,6 +388,13 @@ SappChoirProcessor::~SappChoirProcessor()
 {
     stopTimer();
     apvts_.removeParameterListener("instrument", this);
+    // Join the loader thread before anything it touches goes away. The old
+    // detached-thread + callAsync design left closures capturing `this` alive
+    // past destruction — a crash waiting for the next pump.
+    loaderStop_.store(true, std::memory_order_release);
+    queueCv_.notify_all();
+    if (loaderThread_.joinable())
+        loaderThread_.join();
 }
 
 void SappChoirProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -242,6 +425,9 @@ void SappChoirProcessor::pushParamsToEngine()
     p.spaceDecay = pSpaceDecay_->load();
     p.spaceDamping = pSpaceDamping_->load();
     p.legato = pLegato_->load();
+    // The engine owns the `clean` contract (ChoirEngine::cleanScale) — hand
+    // it the raw value.
+    p.clean = pClean_->load();
     p.masterGainDb = pMaster_->load();
     p.limiter = pLimiter_->load() > 0.5f;
     p.quality = int(pQuality_->load());
@@ -342,6 +528,13 @@ void SappChoirProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                         buffer.getWritePointer(0), buffer.getWritePointer(1),
                         buffer.getNumSamples());
     }
+
+    // Silence → voices: flag it so the loader thread names what just sounded.
+    const int voices = engine_.sampler().activeVoiceCount();
+    if (voices > 0 && lastVoiceCount_ == 0)
+        audioBatchStarted_.store(true, std::memory_order_relaxed);
+    lastVoiceCount_ = voices;
+
     midi.clear();
 }
 
@@ -349,80 +542,84 @@ void SappChoirProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
 void SappChoirProcessor::loadDiagnosticInstrument()
 {
-    const uint64_t generation = ++loadGeneration_;
-    loading_ = true;
+    LoadJob job;
+    job.kind = LoadJob::Kind::Diagnostic;
+    job.generation = ++loadGeneration_;
+    // The construction diagnostic is generation 1 and must stay quiet about
+    // the `instrument` parameter; every later diagnostic is a deliberate
+    // "go back to the built-in choir" and does move it.
+    job.syncParameter = job.generation > 1;
     {
         const juce::ScopedLock sl(loadLock_);
         loadStatus_ = "Generating built-in choir...";
     }
-    std::thread([this, generation] {
-        // Built-in: the diagnostic instrument refiltered into vowel layers.
-        auto inst = makeVowelInstrument(sapp::sounds::makeDiagnosticInstrument(), kVowelCc);
-        sapp::sounds::LoadResult result;
-        result.instrument = inst;
-        result.ok = true;
-        juce::MessageManager::callAsync([this, result = std::move(result), generation]() mutable {
-            finishLoad(std::move(result), {}, generation);
-        });
-    }).detach();
+    enqueueLoad(std::move(job));
 }
 
 void SappChoirProcessor::loadSfzInstrument(const juce::File& sfzFile)
 {
-    const uint64_t generation = ++loadGeneration_;
-    loading_ = true;
+    LoadJob job;
+    job.kind = LoadJob::Kind::Sfz;
+    job.path = sfzFile.getFullPathName();
+    job.generation = ++loadGeneration_;
     {
         const juce::ScopedLock sl(loadLock_);
         loadStatus_ = "Loading " + sfzFile.getFileName() + "...";
     }
-    const juce::String path = sfzFile.getFullPathName();
-    std::thread([this, path, generation] {
-        sapp::sounds::InstrumentLoader loader;
-        auto result = loader.loadSfz(path.toStdString());
-        // Vowel morph: generated formant layers unless the library ships its
-        // own crossfades on the Vowel CC. Runs here, off the audio thread.
-        if (result.ok && result.instrument != nullptr)
-            result.instrument = makeVowelInstrument(result.instrument, kVowelCc);
-        juce::MessageManager::callAsync([this, result = std::move(result), path, generation]() mutable {
-            finishLoad(std::move(result), path, generation);
-        });
-    }).detach();
+    enqueueLoad(std::move(job));
 }
 
+// Runs on the LOADER THREAD (never the message thread — issue #1).
 void SappChoirProcessor::finishLoad(sapp::sounds::LoadResult result,
-                                    const juce::String& path, uint64_t generation)
+                                    const juce::String& path, uint64_t generation,
+                                    bool syncParameter)
 {
     if (generation != loadGeneration_.load()) return;  // superseded
-    loading_ = false;
 
-    const juce::ScopedLock sl(loadLock_);
-    if (!result.ok || result.instrument == nullptr) {
-        loadStatus_ = "Load failed";
-        for (const auto& d : result.diagnostics)
-            if (d.severity == sapp::sounds::Severity::Error) {
-                loadStatus_ = "Load failed: " + juce::String(d.message);
-                break;
-            }
-    } else {
-        engine_.setInstrument(result.instrument);
-        engine_.collectRetired();
-        sfzPath_ = path;
-        instrumentName_ = juce::String(result.instrument->definition.name);
-        loadStatus_ = result.missingSamples.empty()
-                          ? "Ready"
-                          : juce::String(result.missingSamples.size()) + " samples missing";
-        lastArticulationParam_ = -1;  // re-apply articulation on next block
+    bool installed = false;
+    {
+        const juce::ScopedLock sl(loadLock_);
+        if (!result.ok || result.instrument == nullptr) {
+            loadStatus_ = "Load failed";
+            for (const auto& d : result.diagnostics)
+                if (d.severity == sapp::sounds::Severity::Error) {
+                    loadStatus_ = "Load failed: " + juce::String(d.message);
+                    break;
+                }
+        } else {
+            engine_.setInstrument(result.instrument);
+            engine_.collectRetired();
+            sfzPath_ = path;
+            instrumentName_ = juce::String(result.instrument->definition.name);
+            loadStatus_ = result.missingSamples.empty()
+                              ? "Ready"
+                              : juce::String(result.missingSamples.size()) + " samples missing";
+            lastArticulationParam_ = -1;  // re-apply articulation on next block
+            installed = true;
+        }
     }
+    if (installed)
+        installCount_.fetch_add(1);
+    logInstalled(path.isEmpty() ? juce::String("DIAGNOSTIC(built-in choir)") : path,
+                 installed);
+
     // Reflect the loaded instrument in the `instrument` parameter (guarded —
     // this must not schedule another load).
-    syncInstrumentParameter(sfzPath_);
-    if (onInstrumentChanged) onInstrumentChanged();
+    if (syncParameter)
+        syncInstrumentParameter(installed ? path : currentInstrumentPath());
+    instrumentChangedFlag_.store(true);
 }
 
 juce::String SappChoirProcessor::currentInstrumentName() const
 {
     const juce::ScopedLock sl(loadLock_);
     return instrumentName_;
+}
+
+juce::String SappChoirProcessor::currentInstrumentPath() const
+{
+    const juce::ScopedLock sl(loadLock_);
+    return sfzPath_;
 }
 
 juce::String SappChoirProcessor::loadStatus() const
@@ -475,9 +672,9 @@ void SappChoirProcessor::setStateInformation(const void* data, int sizeInBytes)
         // changes): suppress the `instrument` choice value coming back with
         // the tree so it cannot race the path-based load below. finishLoad
         // re-syncs the parameter once the real instrument is in.
-        applyingInstrumentChoice_ = true;
+        applyingInstrumentChoice_.store(true, std::memory_order_release);
         apvts_.replaceState(state);
-        applyingInstrumentChoice_ = false;
+        applyingInstrumentChoice_.store(false, std::memory_order_release);
         pendingInstrumentChoice_.store(-1);
         const juce::String path = state.getProperty("sfzPath", "").toString();
         if (path.isNotEmpty() && juce::File(path).existsAsFile())

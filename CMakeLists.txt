@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(SappChoir VERSION 0.6.0 LANGUAGES C CXX)
+project(SappChoir VERSION 0.7.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -46,6 +46,9 @@ add_library(sappchoir_core STATIC
 )
 target_include_directories(sappchoir_core PUBLIC src)
 target_link_libraries(sappchoir_core PUBLIC Sapp::Sounds)
+# The build stamp the diagnostic log lines carry (SappChoir-build:, and
+# SappChoir-audio-source: when a voice batch starts from silence).
+target_compile_definitions(sappchoir_core PUBLIC SAPPCHOIR_VERSION="${PROJECT_VERSION}")
 sappchoir_set_warnings(sappchoir_core)
 
 # -------------------------------------------------------------------- cli ---
@@ -127,6 +130,36 @@ if(SAPPCHOIR_BUILD_PLUGIN)
     JUCE_VST3_CAN_REPLACE_VST2=0
     JUCE_DISPLAY_SPLASH_SCREEN=0
   )
+
+  # ---------------------------------------------------- headless harness ---
+  # The station host: no editor, no dispatch loop. Cross-platform on purpose —
+  # sappchoir #1 only reproduces where the JUCE message loop never runs, so
+  # this is the target that guards it (and CTest runs its selftest).
+  juce_add_console_app(SappChoirHeadless PRODUCT_NAME "sappchoir-headless")
+  target_sources(SappChoirHeadless PRIVATE
+    tools/headless/main.cpp
+    src/plugin/PluginProcessor.cpp
+    src/plugin/PluginEditor.cpp
+    src/plugin/SoundsPanel.cpp
+  )
+  target_include_directories(SappChoirHeadless PRIVATE src/plugin)
+  target_link_libraries(SappChoirHeadless PRIVATE
+    sappchoir_core
+    juce::juce_audio_utils
+    juce::juce_dsp
+    juce::juce_recommended_config_flags
+  )
+  target_compile_definitions(SappChoirHeadless PRIVATE
+    JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_MODAL_LOOPS_PERMITTED=1
+    SAPPCHOIR_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
+  set_target_properties(SappChoirHeadless PROPERTIES OUTPUT_NAME sappchoir-headless)
+
+  if(SAPPCHOIR_BUILD_TESTS)
+    # The regression that guards issue #1. It runs the PLUGIN processor, so it
+    # only exists when the plugin target is built — which is the point
+    # (sappkeys #1: tests green while the installed binary stayed stale).
+    add_test(NAME headless COMMAND SappChoirHeadless selftest)
+  endif()
 
   if(APPLE)
     # Offscreen editor snapshot tool (UI verification without screen capture).

@@ -1,0 +1,6 @@
+// Headless-regression fixture (sappchoir #1): deliberately quieter AND an
+// octave lower, so "did the NAMED instrument sound?" is answerable from the
+// audio alone.
+<region> sample=../choir-tone.wav lokey=0 hikey=127 pitch_keycenter=60
+         loop_mode=loop_continuous loop_start=0 loop_end=47999
+         ampeg_attack=0.02 ampeg_release=0.3 volume=-18 transpose=-12

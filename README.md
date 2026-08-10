@@ -38,6 +38,8 @@ from GitHub).
 - `src/plugin/` — JUCE processor + candlelit-cathedral editor (vowel wheel)
 - `src/cli/` — `sappchoir` agent CLI ([docs/agent_api.md](docs/agent_api.md))
 - `tools/uishot/` — offscreen editor screenshot + `--cctest` SappLink proof
+- `tools/headless/` — `sappchoir-headless`: the station host (no editor, no
+  JUCE dispatch loop); `selftest` is the issue #1 regression
 - `tests/` — Catch2 unit tests + vendored SappLink manifest
 - `docs/` — [agent_api.md](docs/agent_api.md), [sapplink.md](docs/sapplink.md)
 

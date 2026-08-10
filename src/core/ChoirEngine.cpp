@@ -34,6 +34,7 @@ void ChoirEngine::prepare(double sampleRate, int maxBlockFrames)
     tailL_.assign(n, 0.0f); tailR_.assign(n, 0.0f);
 
     lpL_ = lpR_ = airLpL_ = airLpR_ = noiseLp_ = envFollow_ = 0.0f;
+    smNoise_ = 0.0f;
     liveDynamics_ = liveExpression_ = -1.0f;
     lastSentVowelCc_ = -1;
     lastSize_ = lastDecay_ = lastDamp_ = lastPredelay_ = -1.0f;
@@ -89,8 +90,9 @@ void ChoirEngine::applyQuality(const ChoirParams& p) noexcept
         sampler_.setInterpolationQuality(p.quality == 0 ? 0 : 1);
     }
     // Ensemble size: per-note random detune widens the section. A large
-    // choir spreads to ~±7 cents per singer.
-    const float cents = p.ensemble * 14.0f;
+    // choir spreads to ~±7 cents per singer. `clean` scales the detune away
+    // (it is humanization, not size — see cleanScale()).
+    const float cents = p.ensemble * 14.0f * cleanScale(p);
     if (cents != lastEnsembleCents_) {
         lastEnsembleCents_ = cents;
         sampler_.setRandomTuneCents(cents);
@@ -173,6 +175,9 @@ void ChoirEngine::process(const MidiEvent* events, int eventCount,
     const float tailTarget = p.tailLevel;
     const float masterTarget = dbToGain(p.masterGainDb);
     const float airTarget = std::clamp(p.breath, 0.0f, 1.0f);
+    // The air/HF shelf is a tone control and stays; only the breath-NOISE
+    // bed is a modeled imperfection, so only it is scaled by `clean`.
+    const float noiseTarget = airTarget * cleanScale(p);
 
     // Room parameter updates only when changed (cheap checks, RT-safe).
     const float predelayMs = 10.0f + p.spaceSize * 18.0f;
@@ -190,7 +195,8 @@ void ChoirEngine::process(const MidiEvent* events, int eventCount,
     const float smSlow = smoothCoef(sampleRate_, 40.0f);
 
     // Ensemble breathing: a very slow, gentle collective level wave.
-    const float breatheDepth = 0.012f * p.ensemble;
+    const float clean = cleanScale(p);
+    const float breatheDepth = 0.012f * p.ensemble * clean;
     const float breatheInc = float(2.0 * 3.14159265 * 0.09 / sampleRate_);
 
     // Breath/air: shelf split at ~4 kHz; breath-noise bed follows the choir's
@@ -211,6 +217,7 @@ void ChoirEngine::process(const MidiEvent* events, int eventCount,
         smTail_ += smSlow * (tailTarget - smTail_);
         smMaster_ += smSlow * (masterTarget - smMaster_);
         smAir_ += smSlow * (airTarget - smAir_);
+        smNoise_ += smSlow * (noiseTarget - smNoise_);
 
         float l = dryL_[size_t(f)];
         float r = dryR_[size_t(f)];
@@ -236,11 +243,11 @@ void ChoirEngine::process(const MidiEvent* events, int eventCount,
         // Breath-noise bed, gated by the choir's own level.
         const float level = 0.5f * (std::abs(l) + std::abs(r));
         envFollow_ += (level > envFollow_ ? envAttack : envRelease) * (level - envFollow_);
-        if (smAir_ > 0.0f) {
+        if (smNoise_ > 0.0f) {
             noiseState_ = noiseState_ * 1664525u + 1013904223u;
             const float white = float(noiseState_ >> 9) * (1.0f / 8388608.0f) - 1.0f;
             noiseLp_ += noiseShapeCoef * (white - noiseLp_);
-            const float breathNoise = (white - noiseLp_) * envFollow_ * smAir_ * 0.35f;
+            const float breathNoise = (white - noiseLp_) * envFollow_ * smNoise_ * 0.35f;
             l += breathNoise;
             r -= breathNoise * 0.8f;
         }

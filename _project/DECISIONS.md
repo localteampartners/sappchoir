@@ -58,3 +58,36 @@ Daily check throttled through the shared Sapp settings file (one file for
 the whole product family, per-product key `lastUpdateCheck-sappchoir`).
 Windows can't overwrite a loaded DLL but can rename it: old .vst3 is
 parked as `.old-<tag>` and the new one copied in, with rollback on failure.
+
+## 2026-08-10 — instrument loading owns a thread; the message loop is optional
+
+SappChoir shipped for months rendering digital silence in the sappradio
+station (issue #1) because every instrument install went through
+`MessageManager::callAsync`, and applying the `instrument` choice went
+through a `juce::Timer`. Both are message-thread mechanisms. A plugin
+hosted headlessly has a `MessageManager` — so nothing asserts or errors —
+but nothing pumps it, so neither ever fires. Not even the built-in choir
+loaded; the sampler held a null instrument for the whole render.
+
+The processor now owns a **loader thread** that drains a `LoadJob` queue and
+polls the pending choice/program selection. It runs regardless of the host.
+The 30 Hz timer survives only to fire the editor's `onInstrumentChanged`
+hook, so if it never runs, nothing about the sound changes. Rejected
+alternative: requiring hosts to pump — the station is not a JUCE host and
+the contract must not depend on it.
+
+Two corollaries, both now enforced by `sappchoir-headless selftest`:
+readiness is published as a read-only `libraryReady` parameter (poll it,
+don't guess a settle window), and no parameter may default to a value that
+silences the instrument — including the new `clean`, which defaults to 0.
+
+## 2026-08-10 — `clean` scales humanization, never the signal
+
+`clean` (CC 3) is the suite-wide convention and sapptune's manifest already
+declared it. SappChoir's modeled-imperfection sources are the breath-noise
+bed and the ensemble humanization (per-note random detune plus the slow
+collective level wave), so those are what `(1 - clean)` scales. Deliberately
+NOT scaled, and why: the breath HF/air shelf (a tone control), ensemble
+width and voice count (musical size), the cathedral (architecture), and
+round-robin/velocity variation (which belongs to the sample library).
+`clean=1` therefore changes the character and keeps the level.

@@ -23,6 +23,10 @@ Short running task list. For "what exists *right now*," see [CURRENT_STATE.md](C
 
 ## Done (recent)
 
+- 2026-08-10 — v0.7.0, issue #1: instrument loading moved off the JUCE
+  message thread onto a loader thread (headless renders were silent);
+  `libraryReady` parameter, `SappChoir-audio-source:` logging, suite-wide
+  `clean` (CC 3), `sappchoir-headless` harness + regression.
 - 2026-08-06 — GET SOUNDS panel: in-plugin vocal-library downloads +
   installed-SFZ browser (ported from sapporchestra).
 - 2026-08-06 — v0.1.0: engine, vowel morph, cathedral, plugin UI, CLI,

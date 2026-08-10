@@ -14,6 +14,7 @@ and `src/core/SappLinkCCMap.cpp` together.
 
 | CC | Parameter ID | Range (engineering) | Curve |
 |---|---|---|---|
+| 3 | `clean` | 0 … 1 | linear |
 | 7 | `masterGain` | −24 … 12 dB | linear |
 | 14 | `earlyLevel` | 0 … 1 | linear |
 | 15 | `spaceDecay` | 1 … 20 s | log |
@@ -35,6 +36,13 @@ CC event reaches the sampler, where the vowel layers' live SFZ crossfades
 one meaning, two consumers — parameter state and crossfade engine stay in
 sync by construction (the engine re-injects the Vowel CC only when the
 *parameter* moves, and treats an incoming CC as authoritative).
+
+**CC 3 (`clean`) is the suite-wide convention** (sappsynth / sappkeys /
+sapporchestra / sappkit all use it): 0 = every modeled imperfection as
+designed, 1 = none. In SappChoir it scales the breath-noise bed and the
+ensemble humanization (per-note random detune, slow collective level wave).
+It never scales the musical signal — `clean=1` is just as loud. The audited
+exclusions are listed at `cleanScale()` in `src/core/ChoirEngine.h`.
 
 ## Deliberately NOT in the mapping (existing behavior preserved)
 

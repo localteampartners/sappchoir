@@ -6,6 +6,45 @@ Newest first. Format: `## YYYY-MM-DD — short title`, then bullets.
 
 ---
 
+## 2026-08-10 — v0.7.0: headless silence fixed (issue #1)
+- **Root cause:** every instrument install ran on the JUCE **message
+  thread** (`MessageManager::callAsync` for the load completion, a
+  `juce::Timer` for applying the `instrument` choice). A plugin embedded in
+  a headless host has a MessageManager that nothing pumps, so *nothing*
+  loaded — not even the built-in choir. The sampler held a null instrument
+  for the whole render and SappChoir emitted **digital silence**; the
+  -61.2 dBFS the station measured was the downstream chain's own floor.
+- **Fix:** the processor owns a **loader thread**. Parameter selections,
+  program changes, state restores and the construction diagnostic are
+  queued `LoadJob`s installed there, with no message loop anywhere. The
+  30 Hz timer survives only to fire the editor's `onInstrumentChanged`
+  hook. The loader thread is joined in the destructor (the old detached
+  thread + `callAsync` closures capturing `this` were a latent crash).
+- The construction diagnostic no longer writes the `instrument` parameter,
+  so a selection made microseconds after instantiation cannot be reset.
+- New read-only `libraryReady` host parameter (non-automatable, appended
+  after every APVTS parameter, outside the APVTS so host state cannot
+  restore a stale "ready"). **Poll it instead of a blind `--settle`.**
+- New diagnostic log lines — `SappChoir-build:`, `SappChoir-instrument:`
+  (including `MISSING` for a label that no longer resolves) and
+  `SappChoir-audio-source:` when a voice batch starts from silence. They go
+  to the host's JUCE logger, to stderr on Windows, and to `$SAPP_CHOIR_LOG`.
+- New suite-wide **`clean`** parameter (id `clean`, CC 3, 0..1, default 0,
+  appended after `instrument`): scales SappChoir's modeled-imperfection
+  sources — the breath-noise bed and the ensemble humanization (per-note
+  detune, slow collective level wave). Never scales the musical signal;
+  audited exclusions documented at `cleanScale()` in `ChoirEngine.h`.
+- New `sappchoir-headless` harness (`tools/headless/`) — the station host:
+  no editor, no dispatch loop. `selftest` is the regression (14 checks, run
+  by CTest and `./verify.sh`); it fails on the pre-fix code.
+- `verify.sh` now builds the **plugin** as well as the tests (sappkeys #1:
+  green tests, stale binary) and runs the headless selftest.
+- Measured, station condition (D3–D5 chords, default parameters, no CCs,
+  no dispatch loop): VPO `choir-MIXED-sustain` **-200 → -22.70 dBFS RMS**;
+  Sonatina Mixed Chorus **-200 → -25.87 dBFS**; built-in default
+  **-200 → -25.47 dBFS**. 40 unit tests + 14 headless checks green,
+  auval PASS.
+
 ## 2026-08-09 — host-automatable `instrument` parameter (sapptune #20)
 - New `instrument` AudioParameterChoice (appended LAST — all existing
   automation indices hold): enumerates every installed SFZ instrument from

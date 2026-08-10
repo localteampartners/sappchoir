@@ -31,11 +31,23 @@
     params mid-render exactly like the plugin path.
   - `SappLinkCCMap` — the one CC table both paths share.
 - `src/plugin/` — `SappChoirProcessor` (APVTS, knob→CC bridges, SappLink CC
-  slews, async SFZ load + vowel generation off the audio thread) +
+  slews, SFZ load + vowel generation on its own **loader thread**) +
   `SappChoirEditor` (candlelit cathedral, `VowelWheel`).
+  **Threading rule (issue #1): instrument installs must never depend on the
+  JUCE message thread.** A headless host has a MessageManager that nothing
+  pumps, so `MessageManager::callAsync` and `juce::Timer` never fire; the
+  old design put the entire load path there and rendered silence. The
+  processor owns a loader thread that drains a `LoadJob` queue and polls the
+  pending `instrument` choice / program change. The 30 Hz timer is an editor
+  convenience only. Readiness is published on the read-only `libraryReady`
+  parameter.
 - `src/cli/` — `sappchoir` binary; JSON contracts in docs/agent_api.md.
 - `tools/uishot/` — offscreen editor PNG + `--cctest` plugin-path proof.
-- `tests/` — 28 unit tests incl. SappLink manifest drift guard.
+- `tools/headless/` — `sappchoir-headless`: the station host (no editor, no
+  dispatch loop). `selftest` is the issue #1 regression; `render` measures
+  one station-shaped render.
+- `tests/` — 40 unit tests incl. SappLink manifest drift guard, plus the
+  headless selftest fixture in `tests/data/sfz-headless/`.
 - `src/plugin/UpdateManager.h` — in-plugin updater (background
   thread): GitHub latest-release check vs JucePlugin_VersionString,
   platform-asset download, install (SappChoir.vst3/.component on

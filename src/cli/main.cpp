@@ -91,6 +91,10 @@ const ParamSpec kParams[] = {
      "Legato level 2: overlapping single-line notes slur (attack suppressed, previous note fades). Chord-safe. >=0.5 = on."},
     {"master_gain_db", "masterGain", &ChoirParams::masterGainDb, -24.0f, 12.0f, 0.0f, -1,
      "Master output gain in dB."},
+    {"clean", "clean", &ChoirParams::clean, 0.0f, 1.0f, 0.0f, -1,
+     "Cleanliness (suite-wide, MIDI CC3): 0 = every modeled imperfection as designed, "
+     "1 = none. Scales the breath-noise bed and the ensemble humanization (per-note "
+     "detune, slow collective level wave). Never scales the musical signal."},
 };
 
 InstrumentPtr loadInstrument(const std::string& sfzPath, bool useDiagnostic, bool raw,

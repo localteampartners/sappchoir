@@ -201,3 +201,76 @@ TEST_CASE("output is always finite, limiter caps extremes", "[choir]")
         REQUIRE(std::abs(v) <= 1.0f);
     }
 }
+
+// --- the suite-wide `clean` control (CC 3, sapptune manifest) --------------
+
+TEST_CASE("clean defaults to 0 — the historical, fully modeled sound", "[choir][clean]")
+{
+    // A parameter that silences the instrument at its DEFAULT is exactly the
+    // shape of bug issue #1 taught us to fear. `clean` defaults to "modeled".
+    CHECK(ChoirParams{}.clean == 0.0f);
+    CHECK(cleanScale(ChoirParams{}) == 1.0f);
+}
+
+TEST_CASE("clean=1 scales the breath-noise bed away", "[choir][clean]")
+{
+    // Breath noise is gated by the choir's own envelope, so measure the decay
+    // tail after release, where the noise bed is the loudest thing left
+    // relative to the (silent) sampler output.
+    auto tailHf = [](float clean) {
+        ChoirParams p;
+        p.breath = 1.0f;
+        p.ensemble = 0.0f;   // isolate breath from the ensemble humanization
+        p.tailLevel = 0.0f;  // and from the reverb, which is not scaled
+        p.earlyLevel = 0.0f;
+        p.clean = clean;
+        ChoirEngine engine;
+        freshEngine(engine, p);
+        auto out = run(engine, {noteOn(0, 45, 100)}, 48000);
+        return hfRatio(out.left, 24000, 48000);
+    };
+    // Both still sound; only the noise content differs.
+    CHECK(tailHf(1.0f) < tailHf(0.0f) * 0.9);
+}
+
+TEST_CASE("clean=1 removes the ensemble humanization but not the choir", "[choir][clean]")
+{
+    auto render = [](float clean) {
+        ChoirParams p;
+        p.ensemble = 1.0f;
+        p.breath = 0.0f;
+        p.clean = clean;
+        ChoirEngine engine;
+        freshEngine(engine, p);
+        engine.reseed(7);
+        return run(engine, {noteOn(0, 45, 100), noteOn(0, 52, 100)}, 48000);
+    };
+    const auto modeled = render(0.0f);
+    const auto clinical = render(1.0f);
+
+    // Different sound...
+    double diff = 0.0;
+    for (size_t i = 0; i < modeled.left.size(); ++i)
+        diff += std::abs(double(modeled.left[i]) - clinical.left[i]);
+    CHECK(diff > 1.0);
+
+    // ...but `clean` never scales the musical signal: clean=1 must still be
+    // a fully usable level, within a few dB of the modeled render.
+    CHECK(clinical.rms > 0.01f);
+    CHECK(clinical.rms > modeled.rms * 0.7f);
+    CHECK(clinical.rms < modeled.rms * 1.4f);
+}
+
+TEST_CASE("no ChoirParams default silences the instrument", "[choir][clean]")
+{
+    // The regression contract from issue #1: a fresh engine with untouched
+    // defaults, no CCs and no host assistance must render a usable level.
+    ChoirEngine engine;
+    freshEngine(engine);
+    auto out = run(engine, {noteOn(0, 45, 100), noteOn(0, 52, 100), noteOn(0, 57, 100)},
+                   96000);
+    const double rmsDb = 20.0 * std::log10(std::max(1.0e-12f, out.rms));
+    INFO("default-parameter RMS " << rmsDb << " dBFS");
+    CHECK(rmsDb > -45.0);
+    CHECK(rmsDb < -6.0);
+}
