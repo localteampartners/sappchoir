@@ -6,6 +6,29 @@ Newest first. Format: `## YYYY-MM-DD — short title`, then bullets.
 
 ---
 
+## 2026-08-11 — v0.8.0: a MIDI program change now drops `libraryReady` at once
+
+- Audit of sappkeys #4 ("`libraryReady` lies, so a host that trusts it renders
+  silence") against this repo. The `instrument` parameter path was already
+  correct — `parameterChanged()` clears the flag synchronously and
+  `publishReadiness()` counts the queued select — but **the MIDI
+  program-change branch of `processBlock()` was not**. The audio thread stored
+  `pendingProgramSelect_` and returned; readiness was only recomputed on the
+  loader thread's next pass (~5 ms), so a host that sent the program change
+  and polled in the same breath read the OUTGOING library's "ready" and could
+  render into the load that followed.
+- Measured, `sappchoir-headless selftest`, with a settled instance switched by
+  program change: before — `libraryReady` still 1 the instant `processBlock()`
+  returned, and the settle loop exited immediately on the PREVIOUS library
+  ("Quiet Choir" where the host asked for "Loud Choir"); after — 0
+  immediately, and the flag returns only with `Loud Choir.sfz` installed.
+- Fix: clear the flag on the calling thread, in the program-change branch,
+  right where the select is stored. Writing a parameter from `processBlock()`
+  is this processor's normal path already (`advanceCcSlews()` does it every
+  block).
+- 5 new headless checks (mid-session swap through the `instrument` parameter
+  and through MIDI program change), 19 total. `./verify.sh` green.
+
 ## 2026-08-10 — v0.7.0: headless silence fixed (issue #1)
 - **Root cause:** every instrument install ran on the JUCE **message
   thread** (`MessageManager::callAsync` for the load completion, a
