@@ -14,7 +14,7 @@
 
 ```bash
 cmake -S . -B build-plugin -DCMAKE_BUILD_TYPE=Release -DSAPPCHOIR_BUILD_TESTS=OFF \
-      -DFETCHCONTENT_SOURCE_DIR_JUCE=$HOME/apps/sappsynth/build/_deps/juce-src
+      -DFETCHCONTENT_SOURCE_DIR_JUCE=$HOME/apps/sappaudio/sappsynth/build/_deps/juce-src
 cmake --build build-plugin -j8
 # artefacts: build-plugin/SappChoirPlugin_artefacts/Release/{Standalone,VST3,AU}
 # AU/VST3 are auto-copied to ~/Library/Audio/Plug-Ins on macOS.

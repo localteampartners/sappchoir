@@ -7,7 +7,7 @@
 - **SappSounds** — sibling checkout `../sappsounds` (or FetchContent from
   github.com/localteampartners/sappsounds). The sample engine.
 - **JUCE 8.0.15** — FetchContent; local reuse via
-  `-DFETCHCONTENT_SOURCE_DIR_JUCE=~/apps/sappsynth/build/_deps/juce-src`.
+  `-DFETCHCONTENT_SOURCE_DIR_JUCE=~/apps/sappaudio/sappsynth/build/_deps/juce-src`.
 - **Catch2 v3.7.1** — FetchContent (tests only).
 
 ## Sample libraries (fetched, never committed)

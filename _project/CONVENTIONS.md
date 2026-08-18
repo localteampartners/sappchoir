@@ -3,7 +3,7 @@
 <!-- UPDATE WHEN: you learn a non-obvious workflow fact (deploy quirk, version pin, "never do X") -->
 
 - **JUCE pinned at 8.0.15** — same tag across sappsynth/sapporchestra/
-  sappchoir; reuse the checkout at `~/apps/sappsynth/build/_deps/juce-src`
+  sappchoir; reuse the checkout at `~/apps/sappaudio/sappsynth/build/_deps/juce-src`
   via `FETCHCONTENT_SOURCE_DIR_JUCE` to avoid a 300 MB clone.
 - Two build trees: `build/` (core+CLI+tests, plugin OFF — the fast inner
   loop), `build-plugin/` (plugin + UiShot + the headless harness). `verify.sh`

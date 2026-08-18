@@ -16,7 +16,7 @@ an agent-facing CLI/JSON API, and a SappLink manifest for sapptune.
 
 # Plugin (Standalone / VST3 / AU) — reuse a local JUCE checkout if you have one
 cmake -S . -B build-plugin -DCMAKE_BUILD_TYPE=Release -DSAPPCHOIR_BUILD_TESTS=OFF \
-      -DFETCHCONTENT_SOURCE_DIR_JUCE=$HOME/apps/sappsynth/build/_deps/juce-src
+      -DFETCHCONTENT_SOURCE_DIR_JUCE=$HOME/apps/sappaudio/sappsynth/build/_deps/juce-src
 cmake --build build-plugin -j8
 
 # Choir samples (Sonatina Chorus + CC0 voice sets)
