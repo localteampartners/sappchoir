@@ -2,9 +2,21 @@
 
 <!-- UPDATE WHEN: a feature ships, a deploy happens, something breaks, or something gets fixed. This file answers "what's the project like *right now*?" -->
 
-**Last verified:** 2026-08-11
+**Last verified:** 2026-10-10
 
 ---
+
+## Fixed 2026-10-10 — v0.8.2 (cathedral read one sample past its line)
+
+- The cathedral FDN's modulated read wrapped in single precision; a position
+  a hair below zero rounded to exactly `size` and read one float past the
+  line (heap over-read; garbage → full-scale impulse into the tail). Same bug
+  as sappkeys 0.15.1. Reachable at Cathedral Size below ~1.0 (knob or CC 92);
+  the default 1.15 never hit it in a 2-minute run.
+- Reads now go through `src/core/DelayRead.h` (`delayTap()`: double, wrapped
+  both ways, clamped). Regression tests in `test_cathedral.cpp`; suite green
+  in a plain build and under ASan/UBSan. `./verify.sh` green.
+- Not tagged — the release is driven separately. CMakeLists.txt is 0.8.2.
 
 ## Shipped 2026-08-11 — v0.8.0 (`libraryReady` drops on a MIDI program change)
 

@@ -11,6 +11,8 @@
 #include <cstdint>
 #include <vector>
 
+#include "DelayRead.h"
+
 namespace sapp::choir {
 
 // ------------------------------------------------------------ early taps ---
@@ -118,13 +120,10 @@ public:
                 if (lfoPhase_[i] > 6.2831853f) lfoPhase_[i] -= 6.2831853f;
                 const float mod = std::sin(lfoPhase_[i]) * modSamples_;
                 const float delay = delaySamples_[i] + mod;
-                const int size = int(lines_[size_t(i)].size());
-                float pos = float(writePos_[i]) - delay;
-                while (pos < 0.0f) pos += float(size);
-                const int i0 = int(pos);
-                const float frac = pos - float(i0);
-                const int i1 = i0 + 1 >= size ? 0 : i0 + 1;
-                read[i] = lines_[size_t(i)][size_t(i0)] * (1.0f - frac) + lines_[size_t(i)][size_t(i1)] * frac;
+                // Never a float wrap here (v0.8.2): see DelayRead.h.
+                const DelayTap tap = delayTap(writePos_[i], delay, int(lines_[size_t(i)].size()));
+                read[i] = lines_[size_t(i)][size_t(tap.i0)] * (1.0f - tap.frac) +
+                          lines_[size_t(i)][size_t(tap.i1)] * tap.frac;
                 sum += read[i];
             }
 

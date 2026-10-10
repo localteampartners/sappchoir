@@ -6,6 +6,35 @@ Newest first. Format: `## YYYY-MM-DD — short title`, then bullets.
 
 ---
 
+## 2026-10-10 — 0.8.2: the cathedral read one sample past its line
+
+Audit of sappkeys 0.15.1 (the room over-read behind the intermittent "steady
+partial cluster") against this repo: `CathedralReverb` had the same read.
+
+- **Root cause.** The cathedral FDN wrapped its modulated fractional read in
+  single precision: `pos = write − delay; while (pos < 0) pos += size;
+  i0 = int(pos)`. A position a hair below zero (line 0 at 48 kHz: size 4298,
+  write 643, delay 643.000061 → −6.1e-5) rounds to exactly `size`, so the read
+  took the float ONE PAST the end of the line. Whatever the heap held there
+  (usually 0, sometimes malloc bookkeeping ≈ 1e13) went into the FDN —
+  potentially a full-scale impulse into the tail. Measured with the old code
+  over 2 minutes: Cathedral Size 0.2 → 3 over-reads at 48 kHz, 5 at 96 kHz;
+  0.75 → 1 and 6; the default 1.15 and 1.5 → none (the line-length clamp
+  holds the delay near an integer there). Size is on the knob and CC 92, so
+  it is reachable in a session. AddressSanitizer on the old code:
+  heap-buffer-overflow at `CathedralReverb.h:127`.
+- **Fix.** `src/core/DelayRead.h` — `delayTap()` wraps in double precision
+  both ways and clamps, the idiom sappkeys 0.15.1, sappsynth, sapporchestra
+  and sappkit use. The early-reflection taps use integer indices and a buffer
+  far longer than their longest tap (125 ms of 350 ms), so they were not
+  affected; no other delay reads in `src/`.
+- **Tests:** `test_cathedral.cpp` pins the exact rounding case, sweeps every
+  write position against near-integer delays over the real line lengths
+  (44.1/48/96 kHz), and runs the cathedral 2 minutes at the sizes that hit
+  (48/96 kHz × 0.2/0.75). 42/42 test cases in a plain build and under
+  `-fsanitize=address,undefined`; the long run fails under ASan with the old
+  read. `./verify.sh` green (headless selftest ALL PASS).
+
 ## 2026-10-09 — 0.8.1: rebuilt on SappSounds 0.4 (SFZ filter + LFO opcodes)
 
 No code change here. SappSounds 0.4.0 (MUSIC-QUALITY-PLAN E7) gives every
