@@ -6,6 +6,17 @@ Newest first. Format: `## YYYY-MM-DD — short title`, then bullets.
 
 ---
 
+## 2026-10-09 — 0.8.1: rebuilt on SappSounds 0.4 (SFZ filter + LFO opcodes)
+
+No code change here. SappSounds 0.4.0 (MUSIC-QUALITY-PLAN E7) gives every
+SappSounds sampler a per-voice filter and modulation driven by the library's
+own SFZ text: `fil_type` / `cutoff` / `resonance` / `fil_veltrack` /
+`fil_keytrack`, `fileg_*`, `amplfo_*` / `pitchlfo_*` / `fillfo_*`. This tag
+exists so the Windows release carries them; a library that declares none of
+them plays exactly as before. To USE them, add the opcodes to the SFZ (or a
+wrapper .sfz that `#include`s the library's) under the shared sample root
+(`SAPP_SFZ_ROOT`), then rebuild the index (`build-sfz-index.ps1`).
+
 ## 2026-08-11 — v0.8.0: a MIDI program change now drops `libraryReady` at once
 
 - Audit of sappkeys #4 ("`libraryReady` lies, so a host that trusts it renders
